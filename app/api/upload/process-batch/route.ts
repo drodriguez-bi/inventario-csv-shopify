@@ -3,6 +3,11 @@ import { sql } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { findVariantBySku, setInventoryLevel } from '@/lib/shopify';
 
+// Evita que Next.js intente analizar/optimizar esta ruta estáticamente
+// (necesario por las dependencias de BD/auth usadas aquí).
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 // Permite que el lote tenga tiempo suficiente (varias llamadas secuenciales a Shopify).
 // En plan Hobby el máximo real es 60s; en Pro puedes subir esto hasta 300.
 export const maxDuration = 60;

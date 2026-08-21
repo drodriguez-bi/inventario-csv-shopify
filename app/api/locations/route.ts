@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { getLocations } from '@/lib/shopify';
 
+// Evita que Next.js intente analizar/optimizar esta ruta estáticamente
+// (necesario por las dependencias de BD/auth usadas aquí).
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 export async function GET(req: NextRequest) {
   const storeId = parseInt(req.nextUrl.searchParams.get('storeId') || '', 10);
   if (!storeId) {

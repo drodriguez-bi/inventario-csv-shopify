@@ -1,4 +1,5 @@
-import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+import { neon } from '@neondatabase/serverless';
+import type { NeonQueryFunction } from '@neondatabase/serverless';
 
 // IMPORTANTE: la conexión se crea de forma perezosa (solo al ejecutar la
 // primera consulta en tiempo de ejecución), no al importar este módulo.

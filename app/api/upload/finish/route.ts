@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+// Evita que Next.js intente analizar/optimizar esta ruta estáticamente
+// (necesario por las dependencias de BD/auth usadas aquí).
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 export async function POST(req: NextRequest) {
   const { uploadId } = await req.json();
 

@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 
+// Evita que Next.js intente analizar/optimizar esta ruta estáticamente
+// (necesario por las dependencias de BD/auth usadas aquí).
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 export async function GET() {
   const rows = await sql`SELECT COUNT(*)::int AS c FROM users`;
   return NextResponse.json({ needsSetup: rows[0].c === 0 });
