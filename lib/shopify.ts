@@ -165,7 +165,32 @@ export async function setInventoryLevel(
     }
   }
 
-  // 2) Reemplazar (no sumar) la cantidad disponible en esa sucursal.
+  // 2) Consultar la cantidad actual (ahora es obligatoria para el reemplazo,
+  //    Shopify la usa como verificación de que no cambió entre medio).
+  const currentQtyQuery = `
+    query getCurrentQty($inventoryItemId: ID!, $locationId: ID!) {
+      inventoryItem(id: $inventoryItemId) {
+        inventoryLevel(locationId: $locationId) {
+          quantities(names: ["available"]) {
+            quantity
+          }
+        }
+      }
+    }
+  `;
+  const currentQtyResult = await shopifyGraphQL(store, currentQtyQuery, {
+    inventoryItemId: inventoryItemGid,
+    locationId: locationGid,
+  });
+
+  if (!currentQtyResult.ok) {
+    return { ok: false, error: currentQtyResult.error };
+  }
+
+  const quantities = currentQtyResult.data?.data?.inventoryItem?.inventoryLevel?.quantities ?? [];
+  const changeFromQuantity = quantities.length > 0 ? quantities[0].quantity : 0;
+
+  // 3) Reemplazar (no sumar) la cantidad disponible en esa sucursal.
   const setMutation = `
     mutation setQuantities($input: InventorySetQuantitiesInput!, $idempotencyKey: String!) {
       inventorySetQuantities(input: $input) @idempotent(key: $idempotencyKey) {
@@ -183,6 +208,7 @@ export async function setInventoryLevel(
           inventoryItemId: inventoryItemGid,
           locationId: locationGid,
           quantity,
+          changeFromQuantity,
         },
       ],
     },
