@@ -137,7 +137,7 @@ export async function setInventoryLevel(
   //    Si ya lo estaba, Shopify simplemente no hace nada (no da error).
   const activateMutation = `
     mutation activate($inventoryItemId: ID!, $locationId: ID!) {
-      inventoryActivate(inventoryItemId: $inventoryItemId, locationId: $locationId) {
+      inventoryActivate(inventoryItemId: $inventoryItemId, locationId: $locationId) @idempotent {
         inventoryLevel { id }
         userErrors { field message }
       }
@@ -165,7 +165,7 @@ export async function setInventoryLevel(
   // 2) Reemplazar (no sumar) la cantidad disponible en esa sucursal.
   const setMutation = `
     mutation setQuantities($input: InventorySetQuantitiesInput!) {
-      inventorySetQuantities(input: $input) {
+      inventorySetQuantities(input: $input) @idempotent {
         inventoryAdjustmentGroup { createdAt }
         userErrors { field message }
       }
