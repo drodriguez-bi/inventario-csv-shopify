@@ -102,7 +102,7 @@ export default function StoresPage() {
           </label>
           <label>
             Versión de API (opcional)
-            <input value={apiVersion} onChange={(e) => setApiVersion(e.target.value)} placeholder="2024-01" />
+            <input value={apiVersion} onChange={(e) => setApiVersion(e.target.value)} placeholder="2025-10" />
           </label>
           <button type="submit" disabled={loading}>{loading ? 'Guardando...' : 'Guardar tienda'}</button>
         </form>
@@ -136,11 +136,9 @@ export default function StoresPage() {
                     )}
                   </td>
                   <td style={{ display: 'flex', gap: 8 }}>
-                    {!s.connected && (
-                      <a href={`/api/shopify/install?storeId=${s.id}`}>
-                        <button type="button">Conectar con Shopify</button>
-                      </a>
-                    )}
+                    <a href={`/api/shopify/install?storeId=${s.id}`}>
+                      <button type="button">{s.connected ? 'Reconectar' : 'Conectar con Shopify'}</button>
+                    </a>
                     <button className="btn-danger-sm" onClick={() => handleDelete(s.id)}>Eliminar</button>
                   </td>
                 </tr>

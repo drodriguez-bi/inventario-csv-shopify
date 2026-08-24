@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   const { name, shop_domain, client_id, client_secret, api_version } = await req.json();
 
   let domain = (shop_domain || '').trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
-  const version = (api_version || '').trim() || '2024-01';
+  const version = (api_version || '').trim() || '2025-10';
 
   if (!name?.trim() || !domain || !client_id?.trim() || !client_secret?.trim()) {
     return NextResponse.json({ ok: false, error: 'Todos los campos son obligatorios.' }, { status: 400 });

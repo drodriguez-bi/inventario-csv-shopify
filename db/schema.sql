@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS stores (
     client_secret VARCHAR(255),        -- de tu app en Shopify Partners (Client Secret)
     access_token VARCHAR(255),         -- se llena solo, tras completar la conexión OAuth
     oauth_state VARCHAR(64),           -- uso interno, temporal, durante la conexión
-    api_version VARCHAR(20) NOT NULL DEFAULT '2024-01',
+    api_version VARCHAR(20) NOT NULL DEFAULT '2025-10',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
