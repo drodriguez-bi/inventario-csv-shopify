@@ -7,17 +7,22 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET() {
-  const rows = await sql`SELECT id, name, shop_domain, api_version FROM stores ORDER BY name`;
+  const rows = await sql`
+    SELECT id, name, shop_domain, api_version,
+           (access_token IS NOT NULL) AS connected
+    FROM stores
+    ORDER BY name
+  `;
   return NextResponse.json({ ok: true, stores: rows });
 }
 
 export async function POST(req: NextRequest) {
-  const { name, shop_domain, access_token, api_version } = await req.json();
+  const { name, shop_domain, client_id, client_secret, api_version } = await req.json();
 
   let domain = (shop_domain || '').trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
   const version = (api_version || '').trim() || '2024-01';
 
-  if (!name?.trim() || !domain || !access_token?.trim()) {
+  if (!name?.trim() || !domain || !client_id?.trim() || !client_secret?.trim()) {
     return NextResponse.json({ ok: false, error: 'Todos los campos son obligatorios.' }, { status: 400 });
   }
   if (!domain.endsWith('.myshopify.com')) {
@@ -27,10 +32,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  await sql`
-    INSERT INTO stores (name, shop_domain, access_token, api_version)
-    VALUES (${name.trim()}, ${domain}, ${access_token.trim()}, ${version})
+  const rows = await sql`
+    INSERT INTO stores (name, shop_domain, client_id, client_secret, api_version)
+    VALUES (${name.trim()}, ${domain}, ${client_id.trim()}, ${client_secret.trim()}, ${version})
+    RETURNING id
   `;
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, storeId: rows[0].id });
 }

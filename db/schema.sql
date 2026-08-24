@@ -12,7 +12,10 @@ CREATE TABLE IF NOT EXISTS stores (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     shop_domain VARCHAR(255) NOT NULL, -- ej: stanley-1913-mx.myshopify.com
-    access_token VARCHAR(255) NOT NULL,
+    client_id VARCHAR(255),            -- de tu app en Shopify Partners (Client ID)
+    client_secret VARCHAR(255),        -- de tu app en Shopify Partners (Client Secret)
+    access_token VARCHAR(255),         -- se llena solo, tras completar la conexión OAuth
+    oauth_state VARCHAR(64),           -- uso interno, temporal, durante la conexión
     api_version VARCHAR(20) NOT NULL DEFAULT '2024-01',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );

@@ -43,8 +43,37 @@ sucursal específica de Shopify (usa `inventory_levels/set`, no `adjust`).
 1. Entra a la URL que te dio Vercel (`https://tu-proyecto.vercel.app`).
 2. Como no hay usuarios todavía, te va a pedir crear el primer usuario
    administrador. Ese formulario se autodeshabilita después de usarse una vez.
-3. Inicia sesión y ve a **Tiendas** para agregar cada tienda Shopify que vayas
-   a administrar (dominio `.myshopify.com` + access token).
+3. Inicia sesión y ve a **Tiendas** para conectar cada tienda Shopify que vayas
+   a administrar (ver sección 5.1 para crear la app en Shopify Partners).
+
+### 5.1 Crear la app en Shopify Partners y conectarla
+
+Shopify ya no entrega un token fijo directo al crear una app — ahora usa OAuth
+(Client ID + Client Secret), así que el sistema hace ese "handshake" por ti.
+
+1. Entra a [partners.shopify.com](https://partners.shopify.com) → **Apps** →
+   **Create app**.
+2. Configúrala con distribución **Custom** (para una tienda específica, no
+   pública en el App Store).
+3. En **Configuration > Admin API integration**, activa estos scopes:
+   `read_products`, `read_locations`, `read_inventory`, `write_inventory`.
+4. En **Configuration > URLs**, agrega en **Allowed redirection URL(s)**:
+   ```
+   https://tu-proyecto.vercel.app/api/shopify/callback
+   ```
+   (usa tu dominio real de Vercel).
+5. Guarda. Ve a la pestaña **API credentials** — ahí verás **Client ID** y
+   **Client Secret**. Cópialos (el secret solo se muestra completo ahí).
+6. En tu sistema, ve a **Tiendas** → llena el formulario con el nombre, el
+   dominio `.myshopify.com` de la tienda, y ese Client ID / Client Secret →
+   **Guardar tienda**.
+7. En la tabla de tiendas, la nueva tienda aparece con estatus **Pendiente** y
+   un botón **Conectar con Shopify** — dale clic.
+8. Te manda a una pantalla de Shopify pidiendo autorizar los permisos en esa
+   tienda → acepta.
+9. Te regresa automáticamente a **Tiendas**, ahora con estatus **Conectada**.
+   Internamente el sistema ya guardó el access token — no tienes que copiar
+   nada más.
 
 ## 6. Uso normal
 1. **Nueva carga** → elige la tienda → el sistema trae automáticamente las

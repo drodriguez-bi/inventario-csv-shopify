@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-type Store = { id: number; name: string; shop_domain: string; api_version: string };
+type Store = { id: number; name: string; shop_domain: string; api_version: string; connected: boolean };
 
 export default function StoresPage() {
   const [stores, setStores] = useState<Store[]>([]);
@@ -12,7 +12,8 @@ export default function StoresPage() {
 
   const [name, setName] = useState('');
   const [shopDomain, setShopDomain] = useState('');
-  const [accessToken, setAccessToken] = useState('');
+  const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
   const [apiVersion, setApiVersion] = useState('');
 
   async function loadStores() {
@@ -23,6 +24,10 @@ export default function StoresPage() {
 
   useEffect(() => {
     loadStores();
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('connected') === '1') {
+      setSuccess('¡Tienda conectada correctamente! Ya puedes usarla para subir inventario.');
+    }
   }, []);
 
   async function handleAdd(e: React.FormEvent) {
@@ -34,7 +39,13 @@ export default function StoresPage() {
     const res = await fetch('/api/stores', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, shop_domain: shopDomain, access_token: accessToken, api_version: apiVersion }),
+      body: JSON.stringify({
+        name,
+        shop_domain: shopDomain,
+        client_id: clientId,
+        client_secret: clientSecret,
+        api_version: apiVersion,
+      }),
     });
     const data = await res.json();
     setLoading(false);
@@ -44,10 +55,11 @@ export default function StoresPage() {
       return;
     }
 
-    setSuccess('Tienda agregada correctamente.');
+    setSuccess('Tienda guardada. Ahora dale clic en "Conectar con Shopify" para autorizarla.');
     setName('');
     setShopDomain('');
-    setAccessToken('');
+    setClientId('');
+    setClientSecret('');
     setApiVersion('');
     loadStores();
   }
@@ -81,13 +93,12 @@ export default function StoresPage() {
             />
           </label>
           <label>
-            Access Token (app personalizada de Shopify Partners)
-            <input
-              value={accessToken}
-              onChange={(e) => setAccessToken(e.target.value)}
-              placeholder="shpat_xxxxxxxxxxxxxxxxx"
-              required
-            />
+            Client ID (de tu app en Shopify Partners)
+            <input value={clientId} onChange={(e) => setClientId(e.target.value)} required />
+          </label>
+          <label>
+            Client Secret (de tu app en Shopify Partners)
+            <input value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} required />
           </label>
           <label>
             Versión de API (opcional)
@@ -96,7 +107,9 @@ export default function StoresPage() {
           <button type="submit" disabled={loading}>{loading ? 'Guardando...' : 'Guardar tienda'}</button>
         </form>
         <p className="muted">
-          El access token requiere los scopes <code>read_inventory, write_inventory, read_products, read_locations</code> en la app personalizada de Shopify Partners.
+          En la configuración de tu app en Shopify Partners, agrega esta URL en <strong>Allowed redirection URL(s)</strong>:
+          <br />
+          <code>{typeof window !== 'undefined' ? window.location.origin : ''}/api/shopify/callback</code>
         </p>
       </div>
 
@@ -107,7 +120,7 @@ export default function StoresPage() {
         ) : (
           <table className="table">
             <thead>
-              <tr><th>Nombre</th><th>Dominio</th><th>API</th><th></th></tr>
+              <tr><th>Nombre</th><th>Dominio</th><th>API</th><th>Estatus</th><th></th></tr>
             </thead>
             <tbody>
               {stores.map((s) => (
@@ -116,6 +129,18 @@ export default function StoresPage() {
                   <td>{s.shop_domain}</td>
                   <td>{s.api_version}</td>
                   <td>
+                    {s.connected ? (
+                      <span className="badge badge-success">Conectada</span>
+                    ) : (
+                      <span className="badge badge-warning">Pendiente</span>
+                    )}
+                  </td>
+                  <td style={{ display: 'flex', gap: 8 }}>
+                    {!s.connected && (
+                      <a href={`/api/shopify/install?storeId=${s.id}`}>
+                        <button type="button">Conectar con Shopify</button>
+                      </a>
+                    )}
                     <button className="btn-danger-sm" onClick={() => handleDelete(s.id)}>Eliminar</button>
                   </td>
                 </tr>
