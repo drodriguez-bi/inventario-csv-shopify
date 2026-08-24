@@ -4,28 +4,27 @@ export type ShopifyStore = {
   api_version: string;
 };
 
-async function shopifyFetch(
+async function shopifyGraphQL(
   store: ShopifyStore,
-  method: 'GET' | 'POST',
-  path: string,
-  body?: unknown
-): Promise<{ ok: boolean; httpCode: number; data: any; error: string | null }> {
-  const url = `https://${store.shop_domain}/admin/api/${store.api_version}/${path}`;
+  query: string,
+  variables: Record<string, unknown>
+): Promise<{ ok: boolean; data: any; error: string | null }> {
+  const url = `https://${store.shop_domain}/admin/api/${store.api_version}/graphql.json`;
 
   const res = await fetch(url, {
-    method,
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Shopify-Access-Token': store.access_token,
     },
-    body: body ? JSON.stringify(body) : undefined,
+    body: JSON.stringify({ query, variables }),
     cache: 'no-store',
   });
 
   // Rate limit: esperar y reintentar una vez
   if (res.status === 429) {
     await new Promise((r) => setTimeout(r, 1200));
-    return shopifyFetch(store, method, path, body);
+    return shopifyGraphQL(store, query, variables);
   }
 
   let data: any = null;
@@ -35,26 +34,44 @@ async function shopifyFetch(
     data = null;
   }
 
-  return {
-    ok: res.ok,
-    httpCode: res.status,
-    data,
-    error: !res.ok ? JSON.stringify(data?.errors ?? data ?? res.statusText) : null,
-  };
+  if (!res.ok) {
+    return { ok: false, data: null, error: JSON.stringify(data ?? res.statusText) };
+  }
+
+  // Errores a nivel GraphQL (query/mutation inválida, permisos, etc.)
+  if (data?.errors) {
+    return { ok: false, data: null, error: JSON.stringify(data.errors) };
+  }
+
+  return { ok: true, data, error: null };
 }
 
-async function shopifyGraphQL(store: ShopifyStore, query: string, variables: Record<string, unknown>) {
-  return shopifyFetch(store, 'POST', 'graphql.json', { query, variables });
+function gidToNumericId(gid: string): number {
+  return parseInt(gid.split('/').pop() as string, 10);
 }
 
 export async function getLocations(
   store: ShopifyStore
 ): Promise<{ ok: boolean; locations: { id: number; name: string }[]; error: string | null }> {
-  const result = await shopifyFetch(store, 'GET', 'locations.json');
+  const query = `
+    query getLocations {
+      locations(first: 100) {
+        edges { node { id name } }
+      }
+    }
+  `;
+
+  const result = await shopifyGraphQL(store, query, {});
   if (!result.ok) {
     return { ok: false, locations: [], error: result.error ?? 'No se pudo conectar con Shopify' };
   }
-  const locations = (result.data?.locations ?? []).map((l: any) => ({ id: l.id, name: l.name }));
+
+  const edges = result.data?.data?.locations?.edges ?? [];
+  const locations = edges.map((e: any) => ({
+    id: gidToNumericId(e.node.id),
+    name: e.node.name,
+  }));
+
   return { ok: true, locations, error: null };
 }
 
@@ -97,8 +114,7 @@ export async function findVariantBySku(
     return { found: false, error: null };
   }
 
-  const gid: string = node.inventoryItem.id; // gid://shopify/InventoryItem/123456789
-  const inventoryItemId = parseInt(gid.split('/').pop() as string, 10);
+  const inventoryItemId = gidToNumericId(node.inventoryItem.id);
 
   return {
     found: true,
@@ -114,40 +130,70 @@ export async function setInventoryLevel(
   inventoryItemId: number,
   quantity: number
 ): Promise<{ ok: boolean; error: string | null }> {
-  const result = await shopifyFetch(store, 'POST', 'inventory_levels/set.json', {
-    location_id: locationId,
-    inventory_item_id: inventoryItemId,
-    available: quantity,
+  const inventoryItemGid = `gid://shopify/InventoryItem/${inventoryItemId}`;
+  const locationGid = `gid://shopify/Location/${locationId}`;
+
+  // 1) Asegurar que el producto está "activado" (conectado) en esa sucursal.
+  //    Si ya lo estaba, Shopify simplemente no hace nada (no da error).
+  const activateMutation = `
+    mutation activate($inventoryItemId: ID!, $locationId: ID!) {
+      inventoryActivate(inventoryItemId: $inventoryItemId, locationId: $locationId) {
+        inventoryLevel { id }
+        userErrors { field message }
+      }
+    }
+  `;
+  const activateResult = await shopifyGraphQL(store, activateMutation, {
+    inventoryItemId: inventoryItemGid,
+    locationId: locationGid,
   });
 
-  if (result.ok) {
-    return { ok: true, error: null };
+  if (!activateResult.ok) {
+    return { ok: false, error: activateResult.error };
   }
-
-  const errText = result.error ?? '';
-  const notConnected =
-    result.httpCode === 422 ||
-    /not stocked/i.test(errText) ||
-    /not found/i.test(errText);
-
-  if (notConnected) {
-    const connect = await shopifyFetch(store, 'POST', 'inventory_levels/connect.json', {
-      location_id: locationId,
-      inventory_item_id: inventoryItemId,
-    });
-
-    if (connect.ok) {
-      const retry = await shopifyFetch(store, 'POST', 'inventory_levels/set.json', {
-        location_id: locationId,
-        inventory_item_id: inventoryItemId,
-        available: quantity,
-      });
-      if (retry.ok) {
-        return { ok: true, error: null };
-      }
-      return { ok: false, error: retry.error };
+  const activateErrors = activateResult.data?.data?.inventoryActivate?.userErrors ?? [];
+  if (activateErrors.length > 0) {
+    // Si el error es "ya está activo" lo ignoramos; cualquier otro, lo reportamos.
+    const realErrors = activateErrors.filter(
+      (e: any) => !/already active|already exists/i.test(e.message)
+    );
+    if (realErrors.length > 0) {
+      return { ok: false, error: JSON.stringify(realErrors) };
     }
   }
 
-  return { ok: false, error: errText };
+  // 2) Reemplazar (no sumar) la cantidad disponible en esa sucursal.
+  const setMutation = `
+    mutation setQuantities($input: InventorySetQuantitiesInput!) {
+      inventorySetQuantities(input: $input) {
+        inventoryAdjustmentGroup { createdAt }
+        userErrors { field message }
+      }
+    }
+  `;
+  const setResult = await shopifyGraphQL(store, setMutation, {
+    input: {
+      name: 'available',
+      reason: 'correction',
+      ignoreCompareQuantity: true,
+      quantities: [
+        {
+          inventoryItemId: inventoryItemGid,
+          locationId: locationGid,
+          quantity,
+        },
+      ],
+    },
+  });
+
+  if (!setResult.ok) {
+    return { ok: false, error: setResult.error };
+  }
+
+  const setErrors = setResult.data?.data?.inventorySetQuantities?.userErrors ?? [];
+  if (setErrors.length > 0) {
+    return { ok: false, error: JSON.stringify(setErrors) };
+  }
+
+  return { ok: true, error: null };
 }
