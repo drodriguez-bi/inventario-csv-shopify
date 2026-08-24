@@ -178,7 +178,6 @@ export async function setInventoryLevel(
     input: {
       name: 'available',
       reason: 'correction',
-      ignoreCompareQuantity: true,
       quantities: [
         {
           inventoryItemId: inventoryItemGid,
