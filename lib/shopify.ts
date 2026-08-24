@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 export type ShopifyStore = {
   shop_domain: string;
   access_token: string;
@@ -136,8 +138,8 @@ export async function setInventoryLevel(
   // 1) Asegurar que el producto está "activado" (conectado) en esa sucursal.
   //    Si ya lo estaba, Shopify simplemente no hace nada (no da error).
   const activateMutation = `
-    mutation activate($inventoryItemId: ID!, $locationId: ID!) {
-      inventoryActivate(inventoryItemId: $inventoryItemId, locationId: $locationId) @idempotent {
+    mutation activate($inventoryItemId: ID!, $locationId: ID!, $idempotencyKey: String!) {
+      inventoryActivate(inventoryItemId: $inventoryItemId, locationId: $locationId) @idempotent(key: $idempotencyKey) {
         inventoryLevel { id }
         userErrors { field message }
       }
@@ -146,6 +148,7 @@ export async function setInventoryLevel(
   const activateResult = await shopifyGraphQL(store, activateMutation, {
     inventoryItemId: inventoryItemGid,
     locationId: locationGid,
+    idempotencyKey: crypto.randomUUID(),
   });
 
   if (!activateResult.ok) {
@@ -164,8 +167,8 @@ export async function setInventoryLevel(
 
   // 2) Reemplazar (no sumar) la cantidad disponible en esa sucursal.
   const setMutation = `
-    mutation setQuantities($input: InventorySetQuantitiesInput!) {
-      inventorySetQuantities(input: $input) @idempotent {
+    mutation setQuantities($input: InventorySetQuantitiesInput!, $idempotencyKey: String!) {
+      inventorySetQuantities(input: $input) @idempotent(key: $idempotencyKey) {
         inventoryAdjustmentGroup { createdAt }
         userErrors { field message }
       }
@@ -184,6 +187,7 @@ export async function setInventoryLevel(
         },
       ],
     },
+    idempotencyKey: crypto.randomUUID(),
   });
 
   if (!setResult.ok) {
