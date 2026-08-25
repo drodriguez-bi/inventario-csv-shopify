@@ -20,9 +20,19 @@ CREATE TABLE IF NOT EXISTS stores (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS feeds (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,          -- ej: "Gifan"
+    store_id INT NOT NULL REFERENCES stores(id),
+    location_id BIGINT NOT NULL,
+    location_name VARCHAR(255),
+    token VARCHAR(64) UNIQUE NOT NULL,   -- parte secreta de la URL
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS uploads (
     id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES users(id),
+    user_id INT REFERENCES users(id),   -- nulo cuando la carga viene de un feed automático
     store_id INT NOT NULL REFERENCES stores(id),
     location_id BIGINT NOT NULL,
     location_name VARCHAR(255),
@@ -32,6 +42,8 @@ CREATE TABLE IF NOT EXISTS uploads (
     not_found_count INT DEFAULT 0,
     error_count INT DEFAULT 0,
     status VARCHAR(20) NOT NULL DEFAULT 'processing', -- processing | completed | failed
+    source VARCHAR(20) NOT NULL DEFAULT 'manual',      -- manual | feed
+    feed_id INT REFERENCES feeds(id),
     started_at TIMESTAMPTZ DEFAULT NOW(),
     finished_at TIMESTAMPTZ
 );
@@ -41,7 +53,7 @@ CREATE TABLE IF NOT EXISTS upload_items (
     upload_id INT NOT NULL REFERENCES uploads(id) ON DELETE CASCADE,
     sku VARCHAR(100) NOT NULL,
     requested_qty INT NOT NULL,
-    status VARCHAR(20) NOT NULL, -- success | not_found | error
+    status VARCHAR(20) NOT NULL, -- pending | success | not_found | error
     product_title VARCHAR(255),
     message TEXT
 );

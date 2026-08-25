@@ -112,7 +112,7 @@ export async function findVariantBySku(
   }
 
   const node = edges[0].node;
-  if (node.sku.trim() !== sku.trim()) {
+  if (node.sku.trim().toLowerCase() !== sku.trim().toLowerCase()) {
     return { found: false, error: null };
   }
 

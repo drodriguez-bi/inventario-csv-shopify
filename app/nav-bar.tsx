@@ -18,6 +18,7 @@ export default function NavBar({ username }: { username: string | null }) {
         <div className="nav-links">
           <a href="/upload">Nueva carga</a>
           <a href="/history">Historial</a>
+          <a href="/feeds">Feeds</a>
           <a href="/stores">Tiendas</a>
           <span className="nav-user">👤 {username}</span>
           <button className="logout" onClick={handleLogout}>Salir</button>

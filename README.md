@@ -113,7 +113,92 @@ Shopify ya no entrega un token fijo directo al crear una app — ahora usa OAuth
 - Los access tokens de Shopify se guardan en la base de datos Postgres; el
   acceso a esa base debe quedar restringido solo a este proyecto.
 
-## 8. Desarrollo local (opcional)
+## 8. Feeds automáticos (integración con proveedores como Gifan)
+
+Además de la carga manual, el sistema te deja crear **feeds**: links únicos,
+cada uno atado a una tienda y sucursal específica, para que un proveedor
+externo (Gifan u otro) suba su inventario directamente — sin login, sin que
+tú tengas que subir nada a mano. El archivo se procesa solo, en segundo plano.
+
+### 8.1 Configurar la variable de entorno del cron
+
+En Vercel → Settings → Environment Variables, agrega:
+
+- `CRON_SECRET` — una clave secreta larga que tú inventas (ej. genera una con
+  `openssl rand -hex 24`). Protege el endpoint que procesa la cola en segundo
+  plano.
+
+Después de agregarla, espera al siguiente deployment (o haz push de un cambio
+cualquiera para que se recoja).
+
+### 8.2 Correr la migración de base de datos
+
+En el SQL Editor de Neon, ejecuta el contenido de `db/migration_feeds.sql`
+(si tu base ya existía antes de este cambio).
+
+### 8.3 Crear un feed
+
+1. En el sistema, ve a **Feeds** (en el menú superior).
+2. Llena el formulario: un nombre para identificarlo (ej. "Gifan"), la tienda,
+   y la sucursal — igual que cuando haces una carga manual.
+3. Dale **Crear feed**.
+4. En la lista de abajo aparece el link generado — dale clic en **Copiar**.
+
+Ese link se ve así:
+```
+https://tu-dominio.vercel.app/api/feed/9f2a1b7c4e8d...
+```
+La parte larga después de `/feed/` es la clave secreta — nadie puede usar el
+link sin conocerla exacta.
+
+### 8.4 Lo que le das al proveedor
+
+Ese mismo link es al que el proveedor debe mandar una petición `POST` con el
+CSV:
+```
+POST https://tu-dominio.vercel.app/api/feed/9f2a1b7c4e8d...
+Content-Type: text/csv
+
+sku,cantidad
+ABC-001,25
+ABC-002,0
+```
+También acepta `multipart/form-data` con un campo llamado `file`, por si su
+sistema solo sabe subir archivos. Además reconoce automáticamente el formato
+real que usa Gifan (columnas `Item-number` y `Ubicado`), así que no necesitas
+pedirles que cambien nada de su archivo.
+
+Cuando el proveedor manda la petición, el sistema responde de inmediato
+confirmando que lo recibió — el procesamiento real contra Shopify pasa
+después, en segundo plano.
+
+### 8.5 Procesamiento en segundo plano
+
+Un Cron Job de Vercel (configurado en `vercel.json`) llama automáticamente a
+`/api/cron/process-feed` **una vez al día** (límite del plan Hobby gratuito),
+y procesa hasta 25 filas pendientes por corrida — si el archivo es más grande,
+las siguientes corridas van completando el resto (de cualquier feed que tenga
+pendientes, no solo uno).
+
+**Si necesitas que se procese más seguido que una vez al día:** usa un
+servicio externo gratuito como [cron-job.org](https://cron-job.org) para
+llamar a esta URL cada 5-15 minutos en vez de depender del cron de Vercel:
+```
+GET https://tu-dominio.vercel.app/api/cron/process-feed?token=TU_CRON_SECRET
+```
+
+### 8.6 Ver el resultado
+
+Las cargas de cada feed aparecen en **Historial** igual que las manuales,
+marcadas con la etiqueta **"Automática (nombre del feed)"**.
+
+### 8.7 Administrar feeds
+
+Desde la misma pantalla de **Feeds** puedes crear tantos como necesites (uno
+por proveedor, o varios para distintas tiendas/sucursales) y eliminarlos —
+al eliminar uno, ese link deja de funcionar de inmediato.
+
+## 9. Desarrollo local (opcional)
 ```bash
 npm install
 vercel env pull .env.local   # trae las variables desde tu proyecto en Vercel

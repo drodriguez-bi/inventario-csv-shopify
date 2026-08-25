@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 
-const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/auth/logout', '/api/setup'];
+const PUBLIC_PATHS = [
+  '/login',
+  '/api/auth/login',
+  '/api/auth/logout',
+  '/api/setup',
+  '/api/feed', // /api/feed/{token} — receptor externo, no requiere login
+  '/api/cron/process-feed',
+];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -34,5 +41,5 @@ function redirectOrDeny(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/upload/:path*', '/history/:path*', '/stores/:path*', '/api/:path*', '/'],
+  matcher: ['/upload/:path*', '/history/:path*', '/stores/:path*', '/feeds/:path*', '/api/:path*', '/'],
 };

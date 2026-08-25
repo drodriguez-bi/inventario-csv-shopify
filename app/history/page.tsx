@@ -5,8 +5,10 @@ export const dynamic = 'force-dynamic';
 
 export default async function HistoryPage() {
   const uploads = await sql`
-    SELECT u.*, s.name AS store_name
-    FROM uploads u JOIN stores s ON s.id = u.store_id
+    SELECT u.*, s.name AS store_name, f.name AS feed_name
+    FROM uploads u
+    JOIN stores s ON s.id = u.store_id
+    LEFT JOIN feeds f ON f.id = u.feed_id
     ORDER BY u.started_at DESC
     LIMIT 100
   `;
@@ -18,7 +20,7 @@ export default async function HistoryPage() {
         <table className="table">
           <thead>
             <tr>
-              <th>#</th><th>Fecha</th><th>Tienda</th><th>Sucursal</th><th>Archivo</th>
+              <th>#</th><th>Fecha</th><th>Origen</th><th>Tienda</th><th>Sucursal</th><th>Archivo</th>
               <th>Total</th><th>Actualizados</th><th>No encontrados</th><th>Errores</th><th>Estatus</th><th></th>
             </tr>
           </thead>
@@ -27,6 +29,13 @@ export default async function HistoryPage() {
               <tr key={u.id}>
                 <td>#{u.id}</td>
                 <td>{new Date(u.started_at).toLocaleString('es-MX')}</td>
+                <td>
+                  {u.source === 'feed' ? (
+                    <span className="badge badge-warning">Automática ({u.feed_name ?? 'feed'})</span>
+                  ) : (
+                    <span className="badge badge-success">Manual</span>
+                  )}
+                </td>
                 <td>{u.store_name}</td>
                 <td>{u.location_name}</td>
                 <td>{u.filename}</td>
@@ -47,7 +56,7 @@ export default async function HistoryPage() {
               </tr>
             ))}
             {uploads.length === 0 && (
-              <tr><td colSpan={11} className="muted">Aún no hay cargas registradas.</td></tr>
+              <tr><td colSpan={12} className="muted">Aún no hay cargas registradas.</td></tr>
             )}
           </tbody>
         </table>

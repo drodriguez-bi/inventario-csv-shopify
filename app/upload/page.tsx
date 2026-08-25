@@ -60,11 +60,11 @@ export default function UploadPage() {
         transformHeader: (h) => h.trim().toLowerCase(),
         complete: (results) => {
           const fields = (results.meta.fields || []).map((f) => f.trim().toLowerCase());
-          const skuKey = fields.find((f) => f === 'sku');
-          const qtyKey = fields.find((f) => ['cantidad', 'quantity', 'qty'].includes(f));
+          const skuKey = fields.find((f) => ['sku', 'item-number', 'item number', 'itemnumber'].includes(f));
+          const qtyKey = fields.find((f) => ['cantidad', 'quantity', 'qty', 'ubicado'].includes(f));
 
           if (!skuKey || !qtyKey) {
-            reject(new Error('El CSV debe tener una columna "sku" y una columna "cantidad" (o "quantity"/"qty").'));
+            reject(new Error('El CSV debe tener una columna de SKU ("sku" o "Item-number") y una de cantidad ("cantidad", "quantity", "qty" o "Ubicado").'));
             return;
           }
 
