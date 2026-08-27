@@ -1,29 +1,19 @@
 import { sql } from '@/lib/db';
 import { findVariantBySku, setInventoryLevel } from '@/lib/shopify';
 
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
+const CHUNK_SIZE = 15; // cuántas filas se piden a la BD por vuelta
 
 /**
- * Procesa hasta `batchSize` filas pendientes contra Shopify y actualiza los
- * contadores de sus cargas. Devuelve cuántas procesó y si aún quedan más
- * pendientes (de cualquier feed, no solo uno).
+ * Procesa filas pendientes contra Shopify hasta agotar `maxDurationMs` o
+ * hasta que ya no quede nada pendiente (lo que pase primero). El ritmo de
+ * peticiones a Shopify se maneja de forma adaptativa dentro de lib/shopify.ts
+ * (ya no hay una pausa fija aquí), así que esto va tan rápido como el
+ * presupuesto real de la tienda lo permita.
  */
-export async function processPendingBatch(batchSize: number): Promise<{ processed: number; hasMore: boolean }> {
-  const pendingItems = await sql`
-    SELECT ui.id AS item_id, ui.sku, ui.requested_qty, ui.upload_id,
-           u.store_id, u.location_id
-    FROM upload_items ui
-    JOIN uploads u ON u.id = ui.upload_id
-    WHERE ui.status = 'pending'
-    ORDER BY ui.id
-    LIMIT ${batchSize}
-  `;
-
-  if (pendingItems.length === 0) {
-    return { processed: 0, hasMore: false };
-  }
+export async function processPendingBatch(maxDurationMs: number): Promise<{ processed: number; hasMore: boolean }> {
+  const startedAt = Date.now();
+  let processed = 0;
+  const touchedUploadIds = new Set<number>();
 
   const storeCache = new Map<number, any>();
   async function getStore(storeId: number) {
@@ -34,61 +24,78 @@ export async function processPendingBatch(batchSize: number): Promise<{ processe
     return store;
   }
 
-  let processed = 0;
-  const touchedUploadIds = new Set<number>();
+  while (Date.now() - startedAt < maxDurationMs) {
+    const pendingItems = await sql`
+      SELECT ui.id AS item_id, ui.sku, ui.requested_qty, ui.upload_id,
+             u.store_id, u.location_id
+      FROM upload_items ui
+      JOIN uploads u ON u.id = ui.upload_id
+      WHERE ui.status = 'pending'
+      ORDER BY ui.id
+      LIMIT ${CHUNK_SIZE}
+    `;
 
-  for (let i = 0; i < pendingItems.length; i++) {
-    const item: any = pendingItems[i];
-    touchedUploadIds.add(item.upload_id);
-
-    const storeRow = await getStore(item.store_id);
-    if (!storeRow) {
-      await sql`
-        UPDATE upload_items SET status = 'error', message = 'Tienda no encontrada'
-        WHERE id = ${item.item_id}
-      `;
-      processed++;
-      continue;
+    if (pendingItems.length === 0) {
+      break;
     }
 
-    const store = {
-      shop_domain: storeRow.shop_domain,
-      access_token: storeRow.access_token,
-      api_version: storeRow.api_version,
-    };
+    for (const item of pendingItems as any[]) {
+      if (Date.now() - startedAt > maxDurationMs) break;
 
-    const variant = await findVariantBySku(store, item.sku);
+      touchedUploadIds.add(item.upload_id);
 
-    if (variant.error) {
-      await sql`
-        UPDATE upload_items SET status = 'error', message = ${'Error buscando SKU: ' + variant.error}
-        WHERE id = ${item.item_id}
-      `;
-    } else if (!variant.found) {
-      await sql`
-        UPDATE upload_items SET status = 'not_found', message = 'SKU no encontrado en la tienda'
-        WHERE id = ${item.item_id}
-      `;
-    } else {
-      const setResult = await setInventoryLevel(store, item.location_id, variant.inventoryItemId, item.requested_qty);
-      if (setResult.ok) {
+      const storeRow = await getStore(item.store_id);
+      if (!storeRow) {
         await sql`
-          UPDATE upload_items
-          SET status = 'success', product_title = ${variant.productTitle}, message = ${'Inventario actualizado a ' + item.requested_qty}
+          UPDATE upload_items SET status = 'error', message = 'Tienda no encontrada'
+          WHERE id = ${item.item_id}
+        `;
+        processed++;
+        continue;
+      }
+
+      const store = {
+        shop_domain: storeRow.shop_domain,
+        access_token: storeRow.access_token,
+        api_version: storeRow.api_version,
+      };
+
+      const variant = await findVariantBySku(store, item.sku, item.location_id);
+
+      if (variant.error) {
+        await sql`
+          UPDATE upload_items SET status = 'error', message = ${'Error buscando SKU: ' + variant.error}
+          WHERE id = ${item.item_id}
+        `;
+      } else if (!variant.found) {
+        await sql`
+          UPDATE upload_items SET status = 'not_found', message = 'SKU no encontrado en la tienda'
           WHERE id = ${item.item_id}
         `;
       } else {
-        await sql`
-          UPDATE upload_items
-          SET status = 'error', product_title = ${variant.productTitle}, message = ${'Error al actualizar: ' + setResult.error}
-          WHERE id = ${item.item_id}
-        `;
+        const setResult = await setInventoryLevel(
+          store,
+          item.location_id,
+          variant.inventoryItemId,
+          item.requested_qty,
+          variant.currentQuantity
+        );
+        if (setResult.ok) {
+          await sql`
+            UPDATE upload_items
+            SET status = 'success', product_title = ${variant.productTitle}, message = ${'Inventario actualizado a ' + item.requested_qty}
+            WHERE id = ${item.item_id}
+          `;
+        } else {
+          await sql`
+            UPDATE upload_items
+            SET status = 'error', product_title = ${variant.productTitle}, message = ${'Error al actualizar: ' + setResult.error}
+            WHERE id = ${item.item_id}
+          `;
+        }
       }
-    }
 
-    processed++;
-    if (i < pendingItems.length - 1) {
-      await sleep(600); // respeta el rate limit de Shopify
+      processed++;
     }
   }
 
@@ -119,6 +126,8 @@ export async function processPendingBatch(batchSize: number): Promise<{ processe
     }
   }
 
-  const hasMore = pendingItems.length === batchSize;
+  const remainingRows = await sql`SELECT COUNT(*)::int AS c FROM upload_items WHERE status = 'pending'`;
+  const hasMore = (remainingRows[0] as any).c > 0;
+
   return { processed, hasMore };
 }

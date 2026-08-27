@@ -5,9 +5,9 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-// Cuántas filas procesa como máximo en una sola ejecución, para no
+// Cuánto tiempo procesa como máximo en una sola ejecución, para no
 // pasarnos del tiempo máximo permitido por la función serverless.
-const BATCH_SIZE = 40;
+const PROCESSING_MS = 50_000;
 
 export async function GET(req: NextRequest) {
   // Vercel Cron agrega automáticamente este header cuando la variable de
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'No autorizado.' }, { status: 401 });
   }
 
-  const result = await processPendingBatch(BATCH_SIZE);
+  const result = await processPendingBatch(PROCESSING_MS);
 
   return NextResponse.json({
     ok: true,

@@ -7,12 +7,12 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-// Cuántas filas procesamos AL INSTANTE, en la misma petición en la que
+// Cuánto tiempo procesamos AL INSTANTE, en la misma petición en la que
 // llega el archivo, antes de responder. El resto (si el archivo es más
 // grande) lo va terminando el cron / el disparador externo en los minutos
 // siguientes — el límite real de velocidad lo pone la propia API de Shopify,
 // no nuestro sistema.
-const INSTANT_BATCH_SIZE = 35;
+const INSTANT_PROCESSING_MS = 45_000;
 
 // Este es "el servidor" al que un proveedor (Gifan u otro) sube su inventario.
 // No requiere login — el propio link (con su token único) es la protección.
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
 
   // Procesamos el primer bloque AL INSTANTE, antes de responder — así el
   // proveedor ve resultados de inmediato, en vez de esperar al cron.
-  const firstBatch = await processPendingBatch(INSTANT_BATCH_SIZE);
+  const firstBatch = await processPendingBatch(INSTANT_PROCESSING_MS);
 
   return NextResponse.json({
     ok: true,

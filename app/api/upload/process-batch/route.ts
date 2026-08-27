@@ -14,10 +14,6 @@ export const maxDuration = 60;
 
 type Row = { sku: string; qty: number };
 
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) {
@@ -52,10 +48,8 @@ export async function POST(req: NextRequest) {
   let notFound = 0;
   let errors = 0;
 
-  for (let i = 0; i < rows.length; i++) {
-    const { sku, qty } = rows[i];
-
-    const variant = await findVariantBySku(store, sku);
+  for (const { sku, qty } of rows) {
+    const variant = await findVariantBySku(store, sku, locationId);
 
     if (variant.error) {
       errors++;
@@ -64,7 +58,7 @@ export async function POST(req: NextRequest) {
       notFound++;
       results.push({ sku, qty, status: 'not_found', productTitle: null, message: 'SKU no encontrado en la tienda' });
     } else {
-      const setResult = await setInventoryLevel(store, locationId, variant.inventoryItemId, qty);
+      const setResult = await setInventoryLevel(store, locationId, variant.inventoryItemId, qty, variant.currentQuantity);
       if (setResult.ok) {
         success++;
         results.push({
@@ -84,10 +78,6 @@ export async function POST(req: NextRequest) {
           message: `Error al actualizar: ${setResult.error}`,
         });
       }
-    }
-
-    if (i < rows.length - 1) {
-      await sleep(600); // respeta el rate limit de la API REST de Shopify (~2 req/seg)
     }
   }
 
