@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
+import { processPendingBatch } from '@/lib/feedProcessor';
 import Papa from 'papaparse';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
+
+// Cuántas filas procesamos AL INSTANTE, en la misma petición en la que
+// llega el archivo, antes de responder. El resto (si el archivo es más
+// grande) lo va terminando el cron / el disparador externo en los minutos
+// siguientes — el límite real de velocidad lo pone la propia API de Shopify,
+// no nuestro sistema.
+const INSTANT_BATCH_SIZE = 35;
 
 // Este es "el servidor" al que un proveedor (Gifan u otro) sube su inventario.
 // No requiere login — el propio link (con su token único) es la protección.
@@ -13,9 +21,6 @@ export const maxDuration = 60;
 //   POST https://tu-dominio.vercel.app/api/feed/{token}
 //   Content-Type: text/csv  (o multipart/form-data con un campo "file")
 //   Body: el CSV
-//
-// El archivo NO se procesa al instante contra Shopify: se guarda como
-// "pendiente" y una tarea programada (cron) lo va procesando en segundo plano.
 
 export async function POST(req: NextRequest, { params }: { params: { token: string } }) {
   const token = params.token;
@@ -87,17 +92,27 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
   `;
   const uploadId = uploadRows[0].id;
 
-  for (const r of rows) {
-    await sql`
-      INSERT INTO upload_items (upload_id, sku, requested_qty, status)
-      VALUES (${uploadId}, ${r.sku}, ${r.qty}, 'pending')
-    `;
-  }
+  // Una sola inserción masiva (en vez de una por fila) para que archivos
+  // grandes (cientos/miles de filas) no tarden en quedar en cola.
+  const skus = rows.map((r) => r.sku);
+  const qtys = rows.map((r) => r.qty);
+  await sql`
+    INSERT INTO upload_items (upload_id, sku, requested_qty, status)
+    SELECT ${uploadId}, s, q, 'pending'
+    FROM UNNEST(${skus}::text[], ${qtys}::int[]) AS t(s, q)
+  `;
+
+  // Procesamos el primer bloque AL INSTANTE, antes de responder — así el
+  // proveedor ve resultados de inmediato, en vez de esperar al cron.
+  const firstBatch = await processPendingBatch(INSTANT_BATCH_SIZE);
 
   return NextResponse.json({
     ok: true,
-    message: 'Archivo recibido. Se procesará en los próximos minutos.',
+    message: firstBatch.hasMore
+      ? `Archivo recibido. Se procesaron ${firstBatch.processed} filas al instante; el resto se completa en los próximos minutos.`
+      : `Archivo recibido y procesado por completo (${firstBatch.processed} filas).`,
     uploadId,
     totalRows: rows.length,
+    processedInstantly: firstBatch.processed,
   });
 }

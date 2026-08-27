@@ -168,29 +168,32 @@ sistema solo sabe subir archivos. Además reconoce automáticamente el formato
 real que usa Gifan (columnas `Item-number` y `Ubicado`), así que no necesitas
 pedirles que cambien nada de su archivo.
 
-Cuando el proveedor manda la petición, el sistema responde de inmediato
-confirmando que lo recibió — el procesamiento real contra Shopify pasa
-después, en segundo plano.
+### 8.5 Procesamiento: al instante, no espera al cron
 
-### 8.5 Procesamiento en segundo plano
+En el momento en que el proveedor sube el archivo, el sistema **empieza a
+procesarlo de inmediato**, dentro de esa misma petición (hasta ~35 filas
+antes de responder). Si el archivo trae más filas que eso, el resto se
+termina solo en los minutos siguientes — el límite real de qué tan rápido se
+puede ir es de la propia API de Shopify (respeta un límite de velocidad, así
+que actualizar cientos de productos toma varios minutos sin importar qué tan
+bien esté armado el sistema).
 
-Un Cron Job de Vercel (configurado en `vercel.json`) llama automáticamente a
-`/api/cron/process-feed` **una vez al día** (límite del plan Hobby gratuito),
-y procesa hasta 25 filas pendientes por corrida — si el archivo es más grande,
-las siguientes corridas van completando el resto (de cualquier feed que tenga
-pendientes, no solo uno).
-
-**Si necesitas que se procese más seguido que una vez al día:** usa un
-servicio externo gratuito como [cron-job.org](https://cron-job.org) para
-llamar a esta URL cada 5-15 minutos en vez de depender del cron de Vercel:
+Para que ese resto se termine en minutos y no esperar hasta el cron una vez
+al día (límite del plan Hobby gratuito), configura un disparador externo
+gratuito como [cron-job.org](https://cron-job.org) apuntando cada 1-2 minutos
+a:
 ```
 GET https://tu-dominio.vercel.app/api/cron/process-feed?token=TU_CRON_SECRET
 ```
+El Cron Job nativo de Vercel (en `vercel.json`, una vez al día) queda como
+respaldo por si el disparador externo llegara a fallar algún día.
 
 ### 8.6 Ver el resultado
 
 Las cargas de cada feed aparecen en **Historial** igual que las manuales,
-marcadas con la etiqueta **"Automática (nombre del feed)"**.
+marcadas con la etiqueta **"Automática (nombre del feed)"** — puedes entrar
+al detalle para ver en tiempo real cuántas ya se actualizaron mientras el
+resto se sigue procesando.
 
 ### 8.7 Administrar feeds
 
