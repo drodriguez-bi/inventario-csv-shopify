@@ -50,13 +50,17 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     return NextResponse.json({ ok: false, error: 'El cuerpo de la petición está vacío.' }, { status: 400 });
   }
 
+  // Quita el BOM (marca invisible que a veces agrega Excel/Google Sheets al
+  // exportar CSV) si viene al inicio del archivo.
+  csvText = csvText.replace(/^\uFEFF/, '');
+
   const parsed = Papa.parse(csvText.trim(), {
     header: true,
     skipEmptyLines: true,
-    transformHeader: (h: string) => h.trim().toLowerCase(),
+    transformHeader: (h: string) => h.replace(/^\uFEFF/, '').trim().toLowerCase(),
   });
 
-  const fields = (parsed.meta.fields || []).map((f) => f.trim().toLowerCase());
+  const fields = (parsed.meta.fields || []).map((f) => f.replace(/^\uFEFF/, '').trim().toLowerCase());
   const skuKey = fields.find((f) => ['sku', 'item-number', 'item number', 'itemnumber'].includes(f));
   const qtyKey = fields.find((f) => ['cantidad', 'quantity', 'qty', 'ubicado'].includes(f));
 
@@ -66,6 +70,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
         ok: false,
         error:
           'El CSV debe tener una columna de SKU ("sku" o "Item-number") y una de cantidad ("cantidad", "quantity", "qty" o "Ubicado").',
+        detected_columns: fields,
       },
       { status: 400 }
     );

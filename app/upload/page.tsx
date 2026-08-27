@@ -57,9 +57,9 @@ export default function UploadPage() {
       Papa.parse(f, {
         header: true,
         skipEmptyLines: true,
-        transformHeader: (h) => h.trim().toLowerCase(),
+        transformHeader: (h) => h.replace(/^\uFEFF/, '').trim().toLowerCase(),
         complete: (results) => {
-          const fields = (results.meta.fields || []).map((f) => f.trim().toLowerCase());
+          const fields = (results.meta.fields || []).map((f) => f.replace(/^\uFEFF/, '').trim().toLowerCase());
           const skuKey = fields.find((f) => ['sku', 'item-number', 'item number', 'itemnumber'].includes(f));
           const qtyKey = fields.find((f) => ['cantidad', 'quantity', 'qty', 'ubicado'].includes(f));
 
