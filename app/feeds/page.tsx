@@ -136,7 +136,7 @@ export default function FeedsPage() {
         <form onSubmit={handleCreate}>
           <label>
             Nombre (para identificarlo, ej. "Gifan")
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Gifan" required />
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="tu tienda" required />
           </label>
 
           <label>
