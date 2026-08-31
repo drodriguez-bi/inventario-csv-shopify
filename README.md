@@ -151,10 +151,16 @@ https://tu-dominio.vercel.app/api/feed/9f2a1b7c4e8d...
 La parte larga después de `/feed/` es la clave secreta — nadie puede usar el
 link sin conocerla exacta.
 
-### 8.4 Lo que le das al proveedor
+### 8.4 Tres formas de conectar un feed, según quién lo use
 
-Ese mismo link es al que el proveedor debe mandar una petición `POST` con el
-CSV:
+**a) Página web (para una persona, sin conocimientos técnicos):**
+El link que aparece primero en cada feed — se abre en cualquier navegador,
+se elige el archivo con el mouse, y se le da clic a "Subir archivo". Es lo
+que le das a alguien como el contacto de Gifan que usa FileZilla/Windows y no
+programa nada.
+
+**b) Link técnico simple (token en la URL):**
+Para pruebas rápidas con `curl` o Postman:
 ```
 POST https://tu-dominio.vercel.app/api/feed/9f2a1b7c4e8d...
 Content-Type: text/csv
@@ -163,10 +169,34 @@ sku,cantidad
 ABC-001,25
 ABC-002,0
 ```
-También acepta `multipart/form-data` con un campo llamado `file`, por si su
-sistema solo sabe subir archivos. Además reconoce automáticamente el formato
-real que usa Gifan (columnas `Item-number` y `Ubicado`), así que no necesitas
-pedirles que cambien nada de su archivo.
+
+**c) API recomendada para integraciones automáticas (token en header):**
+Si el proveedor tiene su propio sistema/desarrollador, esta es la opción más
+correcta — el token va en el header `Authorization`, no en la URL (más
+estándar y evita que la clave quede expuesta en logs de URLs):
+```
+POST https://tu-dominio.vercel.app/api/feed-inbox
+Authorization: Bearer 9f2a1b7c4e8d...
+Content-Type: text/csv
+
+sku,cantidad
+ABC-001,25
+```
+
+Las tres opciones aceptan también `multipart/form-data` con un campo llamado
+`file`. Y las tres reconocen automáticamente el formato real que usa Gifan
+(columnas `Item-number` y `Ubicado`), así que no necesitas pedirles que
+cambien nada de su archivo.
+
+### 8.4.1 Validaciones que aplica el sistema
+
+- Solo acepta archivos `.csv` (rechaza otros tipos con un error claro).
+- Exige que existan las columnas de SKU y cantidad.
+- Ignora (sin tronar) filas con cantidad negativa o inválida, y te avisa
+  cuántas fueron.
+- Si el archivo trae el mismo SKU repetido varias veces, usa la última
+  aparición y te avisa cuántos duplicados encontró.
+- Límite de 20,000 filas por archivo, como control de cordura.
 
 ### 8.5 Procesamiento: al instante, no espera al cron
 

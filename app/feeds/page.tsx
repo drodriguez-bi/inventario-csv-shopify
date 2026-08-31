@@ -118,14 +118,13 @@ export default function FeedsPage() {
     return `${origin}/api/feed/${token}`;
   }
 
-  async function copyUrl(token: string) {
-    await navigator.clipboard.writeText(feedUrl(token));
-    setSuccess('Link copiado al portapapeles.');
+  function inboxUrl() {
+    return `${origin}/api/feed-inbox`;
   }
 
-  async function copyApiUrl(token: string) {
-    await navigator.clipboard.writeText(apiUrl(token));
-    setSuccess('Link de API copiado al portapapeles.');
+  async function copyText(text: string, label: string) {
+    await navigator.clipboard.writeText(text);
+    setSuccess(`${label} copiado al portapapeles.`);
   }
 
   return (
@@ -186,37 +185,62 @@ export default function FeedsPage() {
         {feeds.length === 0 ? (
           <p className="muted">Aún no hay feeds creados.</p>
         ) : (
-          <table className="table">
-            <thead>
-              <tr><th>Nombre</th><th>Tienda</th><th>Sucursal</th><th>Link para subir el archivo</th><th>Link técnico (API)</th><th></th></tr>
-            </thead>
-            <tbody>
-              {feeds.map((f) => (
-                <tr key={f.id}>
-                  <td>{f.name}</td>
-                  <td>{f.store_name}</td>
-                  <td>{f.location_name}</td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <input readOnly value={feedUrl(f.token)} style={{ fontSize: 12, width: 260 }} />
-                      <button type="button" onClick={() => copyUrl(f.token)}>Copiar</button>
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <input readOnly value={apiUrl(f.token)} style={{ fontSize: 12, width: 260 }} />
-                      <button type="button" onClick={() => copyApiUrl(f.token)}>Copiar</button>
-                    </div>
-                  </td>
-                  <td>
-                    <button className="btn-danger-sm" onClick={() => handleDelete(f.id)}>Eliminar</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          feeds.map((f) => (
+            <div
+              key={f.id}
+              style={{ border: '1px solid #eee', borderRadius: 8, padding: 16, marginBottom: 16 }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div>
+                  <strong>{f.name}</strong>
+                  <span className="muted"> — {f.store_name} · {f.location_name}</span>
+                </div>
+                <button className="btn-danger-sm" onClick={() => handleDelete(f.id)}>Eliminar</button>
+              </div>
+
+              <label style={{ fontSize: 13 }}>
+                Link para subir el archivo (para personas, sin conocimientos técnicos)
+                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                  <input readOnly value={feedUrl(f.token)} style={{ fontSize: 12, flex: 1, minWidth: 0 }} />
+                  <button type="button" onClick={() => copyText(feedUrl(f.token), 'Link')}>Copiar</button>
+                </div>
+              </label>
+
+              <label style={{ fontSize: 13, marginTop: 12 }}>
+                Link técnico simple (token en la URL, para pruebas rápidas con curl)
+                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                  <input readOnly value={apiUrl(f.token)} style={{ fontSize: 12, flex: 1, minWidth: 0 }} />
+                  <button type="button" onClick={() => copyText(apiUrl(f.token), 'Link')}>Copiar</button>
+                </div>
+              </label>
+
+              <label style={{ fontSize: 13, marginTop: 12 }}>
+                API recomendada para integraciones automáticas (token en header, no en la URL)
+                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                  <input readOnly value={inboxUrl()} style={{ fontSize: 12, flex: 1, minWidth: 0 }} />
+                  <button type="button" onClick={() => copyText(inboxUrl(), 'Link')}>Copiar URL</button>
+                  <button type="button" onClick={() => copyText(f.token, 'Token')}>Copiar token</button>
+                </div>
+                <pre style={curlStyle}>
+{`curl -X POST "${inboxUrl()}" \\
+  -H "Authorization: Bearer ${f.token}" \\
+  -H "Content-Type: text/csv" \\
+  --data-binary @archivo.csv`}
+                </pre>
+              </label>
+            </div>
+          ))
         )}
       </div>
     </>
   );
 }
+
+const curlStyle: React.CSSProperties = {
+  background: '#f7f7fa',
+  padding: 12,
+  borderRadius: 6,
+  fontSize: 12,
+  marginTop: 8,
+  overflowX: 'auto',
+};

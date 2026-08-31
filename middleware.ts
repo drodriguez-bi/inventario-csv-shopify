@@ -6,8 +6,9 @@ const PUBLIC_PATHS = [
   '/api/auth/login',
   '/api/auth/logout',
   '/api/setup',
-  '/feed',      // /feed/{token} — página pública de subida, sin login
-  '/api/feed',  // /api/feed/{token} — receptor externo, no requiere login
+  '/feed',             // /feed/{token} — página pública de subida, sin login
+  '/api/feed',         // /api/feed/{token} — receptor externo, no requiere login
+  '/api/feed-inbox',   // receptor externo alterno (auth por header), no requiere login
   '/api/cron/process-feed',
 ];
 
