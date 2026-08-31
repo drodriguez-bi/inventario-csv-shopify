@@ -55,6 +55,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
   }
 
   let csvText: string;
+  let uploadedFilename = `${feed.name}.csv`; // respaldo, por si no hay nombre real disponible
   const contentType = req.headers.get('content-type') || '';
 
   if (contentType.includes('multipart/form-data')) {
@@ -64,6 +65,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
       return NextResponse.json({ ok: false, error: 'No se encontró el archivo (campo "file").' }, { status: 400 });
     }
     csvText = await file.text();
+    if (file.name) uploadedFilename = file.name;
   } else {
     csvText = await req.text();
   }
@@ -112,7 +114,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
   const uploadRows = await sql`
     INSERT INTO uploads (user_id, store_id, location_id, location_name, filename, total_rows, status, source, feed_id)
     VALUES (
-      NULL, ${feed.store_id}, ${feed.location_id}, ${feed.location_name}, ${feed.name + '.csv'},
+      NULL, ${feed.store_id}, ${feed.location_id}, ${feed.location_name}, ${uploadedFilename},
       ${rows.length}, 'processing', 'feed', ${feed.id}
     )
     RETURNING id

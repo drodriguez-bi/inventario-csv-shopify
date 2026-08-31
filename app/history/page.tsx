@@ -28,7 +28,9 @@ export default async function HistoryPage() {
             {uploads.map((u: any) => (
               <tr key={u.id}>
                 <td>#{u.id}</td>
-                <td>{new Date(u.started_at).toLocaleString('es-MX')}</td>
+                <td>
+                  {new Date(u.started_at).toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })}
+                </td>
                 <td>
                   {u.source === 'feed' ? (
                     <span className="badge badge-warning">Automática ({u.feed_name ?? 'feed'})</span>
