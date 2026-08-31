@@ -6,7 +6,8 @@ const PUBLIC_PATHS = [
   '/api/auth/login',
   '/api/auth/logout',
   '/api/setup',
-  '/api/feed', // /api/feed/{token} — receptor externo, no requiere login
+  '/feed',      // /feed/{token} — página pública de subida, sin login
+  '/api/feed',  // /api/feed/{token} — receptor externo, no requiere login
   '/api/cron/process-feed',
 ];
 
@@ -41,5 +42,5 @@ function redirectOrDeny(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/upload/:path*', '/history/:path*', '/stores/:path*', '/feeds/:path*', '/api/:path*', '/'],
+  matcher: ['/upload/:path*', '/history/:path*', '/stores/:path*', '/feeds/:path*', '/feed/:path*', '/api/:path*', '/'],
 };

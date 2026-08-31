@@ -22,6 +22,28 @@ const INSTANT_PROCESSING_MS = 45_000;
 //   Content-Type: text/csv  (o multipart/form-data con un campo "file")
 //   Body: el CSV
 
+export async function GET(req: NextRequest, { params }: { params: { token: string } }) {
+  const token = params.token;
+
+  const rows = await sql`
+    SELECT f.name, s.name AS store_name, f.location_name
+    FROM feeds f JOIN stores s ON s.id = f.store_id
+    WHERE f.token = ${token}
+  `;
+  const feed = rows[0];
+
+  if (!feed) {
+    return NextResponse.json({ ok: false, error: 'Link no válido.' }, { status: 404 });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    name: feed.name,
+    storeName: feed.store_name,
+    locationName: feed.location_name,
+  });
+}
+
 export async function POST(req: NextRequest, { params }: { params: { token: string } }) {
   const token = params.token;
 

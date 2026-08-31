@@ -111,6 +111,10 @@ export default function FeedsPage() {
   }
 
   function feedUrl(token: string) {
+    return `${origin}/feed/${token}`;
+  }
+
+  function apiUrl(token: string) {
     return `${origin}/api/feed/${token}`;
   }
 
@@ -119,14 +123,26 @@ export default function FeedsPage() {
     setSuccess('Link copiado al portapapeles.');
   }
 
+  async function copyApiUrl(token: string) {
+    await navigator.clipboard.writeText(apiUrl(token));
+    setSuccess('Link de API copiado al portapapeles.');
+  }
+
   return (
     <>
       <h1>Feeds automáticos</h1>
       <p className="muted">
         Un feed es un link único, con su propia clave secreta, para que un proveedor (como Gifan) suba
-        su inventario directamente — sin necesidad de que tú subas nada a mano. El archivo se procesa
-        solo, en segundo plano.
+        su inventario — sin necesidad de que tú subas nada a mano. El archivo se procesa solo, en segundo plano.
       </p>
+      <p className="muted">
+        <strong>Link para subir el archivo:</strong> es una página web simple — el proveedor solo la abre
+        en su navegador, elige el archivo y le da clic a "Subir". No necesita usuario, contraseña, ni
+        conocimientos técnicos.<br />
+        <strong>Link técnico (API):</strong> es para cuando el proveedor tiene su propio sistema/desarrollador
+        y puede mandar el archivo automáticamente por código, sin abrir ninguna página.
+      </p>
+
 
       {error && <p className="alert alert-error">{error}</p>}
       {success && <p className="alert alert-success">{success}</p>}
@@ -136,7 +152,7 @@ export default function FeedsPage() {
         <form onSubmit={handleCreate}>
           <label>
             Nombre (para identificarlo, ej. "Gifan")
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="tu tienda" required />
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Gifan" required />
           </label>
 
           <label>
@@ -172,7 +188,7 @@ export default function FeedsPage() {
         ) : (
           <table className="table">
             <thead>
-              <tr><th>Nombre</th><th>Tienda</th><th>Sucursal</th><th>Link</th><th></th></tr>
+              <tr><th>Nombre</th><th>Tienda</th><th>Sucursal</th><th>Link para subir el archivo</th><th>Link técnico (API)</th><th></th></tr>
             </thead>
             <tbody>
               {feeds.map((f) => (
@@ -182,8 +198,14 @@ export default function FeedsPage() {
                   <td>{f.location_name}</td>
                   <td>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <input readOnly value={feedUrl(f.token)} style={{ fontSize: 12, width: 320 }} />
+                      <input readOnly value={feedUrl(f.token)} style={{ fontSize: 12, width: 260 }} />
                       <button type="button" onClick={() => copyUrl(f.token)}>Copiar</button>
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input readOnly value={apiUrl(f.token)} style={{ fontSize: 12, width: 260 }} />
+                      <button type="button" onClick={() => copyApiUrl(f.token)}>Copiar</button>
                     </div>
                   </td>
                   <td>
