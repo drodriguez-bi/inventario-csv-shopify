@@ -231,6 +231,43 @@ Desde la misma pantalla de **Feeds** puedes crear tantos como necesites (uno
 por proveedor, o varios para distintas tiendas/sucursales) y eliminarlos —
 al eliminar uno, ese link deja de funcionar de inmediato.
 
+### 8.8 Feeds que LEEN de un FTP/SFTP (el proveedor ya tiene su servidor)
+
+Cuando el proveedor ya publica su archivo en un servidor FTP/SFTP (como Gifan, que
+lo refresca cada 5 minutos), el sistema va a leerlo por su cuenta:
+
+1. Corre `db/migration_ftp_pull.sql` en el SQL Editor de Neon (una sola vez).
+2. En **Feeds → Crear nuevo feed**, elige *"El sistema lo lee de un servidor FTP/SFTP del
+   proveedor"* y captura protocolo, servidor, usuario y contraseña. Deja "Archivo o carpeta"
+   vacío para que tome el `.csv` más reciente de la raíz (o escribe la ruta exacta).
+3. Dale **Leer ahora** en la tarjeta del feed: conecta, descarga y muestra el resultado
+   (o el error exacto si no pudo conectarse). La primera lectura encola todos los SKU.
+4. Para que se lea solo cada 5 minutos, configura un cron externo (gratis, ej.
+   [cron-job.org](https://cron-job.org)) que haga `GET` cada 5 minutos a:
+   ```
+   https://tu-dominio.vercel.app/api/cron/pull-feeds?token=TU_CRON_SECRET
+   ```
+   El cron nativo de Vercel en `vercel.json` corre una vez al día como respaldo (el plan
+   Hobby no permite más seguido; con plan Pro se puede cambiar a `*/5 * * * *`).
+
+**Qué hace en cada lectura:** descarga el archivo, lo compara contra la última cantidad
+aplicada de cada SKU, y manda a Shopify **solo los que cambiaron**. Si Shopify ya tiene esa
+cantidad, ni siquiera escribe. Si el archivo cambia otra vez antes de terminar de procesar,
+lo pendiente viejo queda como "Reemplazado" y se usa lo más reciente. Cada lectura con
+cambios aparece en **Historial** como carga automática; las lecturas sin cambios no generan
+registro (solo actualizan "Última lectura" en la tarjeta del feed).
+
+**Formato del archivo:** acepta con encabezados (`sku`/`Item-number` y
+`cantidad`/`qty`/`Ubicado`) o sin encabezados (2 columnas: SKU, cantidad).
+
+**Notas:**
+- Usuario y contraseña del FTP se guardan en la base de datos (igual que los tokens de
+  Shopify) y nunca se muestran de nuevo en pantalla.
+- Un SKU que Shopify no encuentra se registra y no se reintenta hasta que su cantidad
+  cambie. Un SKU que da error al escribir sí se reintenta en cada lectura.
+- Vercel no tiene IP fija: si el servidor del proveedor solo acepta conexiones desde IPs
+  autorizadas, no podrá conectarse.
+
 ## 9. Desarrollo local (opcional)
 ```bash
 npm install

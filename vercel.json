@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/cron/process-feed",
+      "path": "/api/cron/pull-feeds",
       "schedule": "0 8 * * *"
     }
   ]

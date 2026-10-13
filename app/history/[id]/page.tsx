@@ -6,7 +6,7 @@ type Item = {
   id: number;
   sku: string;
   requested_qty: number;
-  status: 'success' | 'not_found' | 'error';
+  status: 'success' | 'not_found' | 'error' | 'pending' | 'superseded';
   product_title: string | null;
   message: string | null;
 };
@@ -101,6 +101,10 @@ export default function UploadDetailPage({ params }: { params: { id: string } })
                     <span className="badge badge-success">Actualizado</span>
                   ) : it.status === 'not_found' ? (
                     <span className="badge badge-warning">No encontrado</span>
+                  ) : it.status === 'pending' ? (
+                    <span className="badge badge-warning">Pendiente</span>
+                  ) : it.status === 'superseded' ? (
+                    <span className="badge badge-warning">Reemplazado</span>
                   ) : (
                     <span className="badge badge-error">Error</span>
                   )}

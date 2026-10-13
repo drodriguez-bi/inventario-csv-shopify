@@ -1,9 +1,8 @@
 import { sql } from '@/lib/db';
 import { processPendingBatch } from '@/lib/feedProcessor';
-import Papa from 'papaparse';
+import { parseInventoryCsv } from '@/lib/csvParse';
 
 const INSTANT_PROCESSING_MS = 45_000;
-const MAX_ROWS_PER_FILE = 20_000; // límite de cordura, evita archivos absurdamente grandes por error
 
 export type FeedRow = {
   id: number;
@@ -26,14 +25,12 @@ export type IngestResult =
   | { ok: false; error: string; status: number; detected_columns?: string[] };
 
 /**
- * Recibe el archivo (CSV crudo o multipart/form-data), lo valida, lo encola,
- * y procesa el primer bloque al instante. Compartido por las dos formas de
- * autenticación (token en la URL y token en header Authorization).
+ * Recibe el archivo que un proveedor SUBE (CSV crudo o multipart/form-data),
+ * lo valida, lo encola, y procesa el primer bloque al instante.
  */
 export async function ingestFeedFile(req: Request, feed: FeedRow): Promise<IngestResult> {
   const contentType = req.headers.get('content-type') || '';
 
-  // --- Validación de tipo de archivo ---------------------------------
   const allowedTypes = ['text/csv', 'application/csv', 'text/plain', 'application/vnd.ms-excel'];
   const isMultipart = contentType.includes('multipart/form-data');
   const isAllowedRawType = allowedTypes.some((t) => contentType.includes(t));
@@ -68,88 +65,24 @@ export async function ingestFeedFile(req: Request, feed: FeedRow): Promise<Inges
     return { ok: false, status: 400, error: 'El cuerpo de la petición está vacío.' };
   }
 
-  // Quita el BOM (marca invisible que a veces agrega Excel/Google Sheets al exportar CSV)
-  csvText = csvText.replace(/^\uFEFF/, '');
-
-  const parsed = Papa.parse(csvText.trim(), {
-    header: true,
-    skipEmptyLines: true,
-    transformHeader: (h: string) => h.replace(/^\uFEFF/, '').trim().toLowerCase(),
-  });
-
-  const fields = (parsed.meta.fields || []).map((f) => f.replace(/^\uFEFF/, '').trim().toLowerCase());
-  const skuKey = fields.find((f) => ['sku', 'item-number', 'item number', 'itemnumber'].includes(f));
-  const qtyKey = fields.find((f) => ['cantidad', 'quantity', 'qty', 'ubicado'].includes(f));
-
-  if (!skuKey || !qtyKey) {
-    return {
-      ok: false,
-      status: 400,
-      error:
-        'El CSV debe tener una columna de SKU ("sku" o "Item-number") y una de cantidad ("cantidad", "quantity", "qty" o "Ubicado").',
-      detected_columns: fields,
-    };
+  const parsed = parseInventoryCsv(csvText);
+  if (!parsed.ok) {
+    return { ok: false, status: parsed.status, error: parsed.error, detected_columns: parsed.detected_columns };
   }
-
-  const rawRows = (parsed.data as Record<string, string>[])
-    .map((row) => ({
-      sku: String(row[skuKey] ?? '').trim(),
-      qtyRaw: String(row[qtyKey] ?? '').trim(),
-    }))
-    .filter((r) => r.sku !== '');
-
-  if (rawRows.length === 0) {
-    return { ok: false, status: 400, error: 'El CSV no contiene filas válidas.' };
-  }
-
-  if (rawRows.length > MAX_ROWS_PER_FILE) {
-    return {
-      ok: false,
-      status: 413,
-      error: `El archivo trae ${rawRows.length} filas, más del máximo permitido (${MAX_ROWS_PER_FILE}). Verifica que sea el archivo correcto.`,
-    };
-  }
-
-  // --- Validación de cantidades: rechaza negativas, no las guarda en 0 silenciosamente ---
-  let skippedNegativeQty = 0;
-  const validRows: { sku: string; qty: number }[] = [];
-  for (const r of rawRows) {
-    const qty = parseInt(r.qtyRaw, 10);
-    if (isNaN(qty) || qty < 0) {
-      skippedNegativeQty++;
-      continue;
-    }
-    validRows.push({ sku: r.sku, qty });
-  }
-
-  if (validRows.length === 0) {
-    return {
-      ok: false,
-      status: 400,
-      error: 'Ninguna fila tiene una cantidad válida (0 o mayor). Revisa la columna de cantidad.',
-    };
-  }
-
-  // --- Deduplicar por SKU: si se repite, se queda la última aparición ---
-  const seen = new Map<string, { sku: string; qty: number }>();
-  for (const r of validRows) {
-    seen.set(r.sku.toLowerCase(), r); // la última aparición gana
-  }
-  const dedupedRows = Array.from(seen.values());
-  const duplicatesCollapsed = validRows.length - dedupedRows.length;
+  const rows = parsed.rows;
 
   const uploadRows = await sql`
     INSERT INTO uploads (user_id, store_id, location_id, location_name, filename, total_rows, status, source, feed_id)
     VALUES (
       NULL, ${feed.store_id}, ${feed.location_id}, ${feed.location_name}, ${uploadedFilename},
-      ${dedupedRows.length}, 'processing', 'feed', ${feed.id}
+      ${rows.length}, 'processing', 'feed', ${feed.id}
     )
     RETURNING id
   `;
   const uploadId = uploadRows[0].id;
 
-  const skus = dedupedRows.map((r) => r.sku);
-  const qtys = dedupedRows.map((r) => r.qty);
+  const skus = rows.map((r) => r.sku);
+  const qtys = rows.map((r) => r.qty);
   await sql`
     INSERT INTO upload_items (upload_id, sku, requested_qty, status)
     SELECT ${uploadId}, s, q, 'pending'
@@ -159,8 +92,8 @@ export async function ingestFeedFile(req: Request, feed: FeedRow): Promise<Inges
   const firstBatch = await processPendingBatch(INSTANT_PROCESSING_MS);
 
   const notes: string[] = [];
-  if (skippedNegativeQty > 0) notes.push(`${skippedNegativeQty} fila(s) con cantidad inválida fueron ignoradas`);
-  if (duplicatesCollapsed > 0) notes.push(`${duplicatesCollapsed} SKU(s) duplicados (se usó la última aparición)`);
+  if (parsed.skippedInvalidQty > 0) notes.push(`${parsed.skippedInvalidQty} fila(s) con cantidad inválida fueron ignoradas`);
+  if (parsed.duplicatesCollapsed > 0) notes.push(`${parsed.duplicatesCollapsed} SKU(s) duplicados (se usó la última aparición)`);
 
   const baseMessage = firstBatch.hasMore
     ? `Archivo recibido. Se procesaron ${firstBatch.processed} filas al instante; el resto se completa en los próximos minutos.`
@@ -170,9 +103,9 @@ export async function ingestFeedFile(req: Request, feed: FeedRow): Promise<Inges
     ok: true,
     message: notes.length > 0 ? `${baseMessage} (${notes.join('; ')}.)` : baseMessage,
     uploadId,
-    totalRows: dedupedRows.length,
+    totalRows: rows.length,
     processedInstantly: firstBatch.processed,
-    skippedNegativeQty,
-    duplicatesCollapsed,
+    skippedNegativeQty: parsed.skippedInvalidQty,
+    duplicatesCollapsed: parsed.duplicatesCollapsed,
   };
 }

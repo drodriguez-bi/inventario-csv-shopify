@@ -27,7 +27,24 @@ CREATE TABLE IF NOT EXISTS feeds (
     location_id BIGINT NOT NULL,
     location_name VARCHAR(255),
     token VARCHAR(64) UNIQUE NOT NULL,   -- parte secreta de la URL
+    ftp_protocol VARCHAR(10),            -- ftp | ftps | sftp (solo si el sistema lee el archivo)
+    ftp_host VARCHAR(255),
+    ftp_port INT,
+    ftp_user VARCHAR(255),
+    ftp_password VARCHAR(255),
+    ftp_path VARCHAR(500),
+    last_pulled_at TIMESTAMPTZ,
+    last_pull_status TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS feed_snapshot (
+    feed_id INT NOT NULL REFERENCES feeds(id) ON DELETE CASCADE,
+    sku_key VARCHAR(100) NOT NULL,
+    sku VARCHAR(100) NOT NULL,
+    qty INT NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (feed_id, sku_key)
 );
 
 CREATE TABLE IF NOT EXISTS uploads (

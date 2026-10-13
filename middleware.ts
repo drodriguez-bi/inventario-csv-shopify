@@ -10,6 +10,7 @@ const PUBLIC_PATHS = [
   '/api/feed',         // /api/feed/{token} — receptor externo, no requiere login
   '/api/feed-inbox',   // receptor externo alterno (auth por header), no requiere login
   '/api/cron/process-feed',
+  '/api/cron/pull-feeds',  // lee los FTP de los proveedores (se protege con CRON_SECRET)
 ];
 
 export async function middleware(req: NextRequest) {
