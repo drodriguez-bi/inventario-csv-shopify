@@ -247,6 +247,10 @@ lo refresca cada 5 minutos), el sistema va a leerlo por su cuenta:
    ```
    https://tu-dominio.vercel.app/api/cron/pull-feeds?token=TU_CRON_SECRET
    ```
+   La dirección responde en pocos segundos y sigue procesando Shopify en segundo plano
+   (hasta ~50 s por llamada), así que no choca con el límite de 30 s de cron-job.org.
+   Mientras haya una carga inicial grande (cientos de SKU), conviene ponerlo cada 1 minuto;
+   cuando ya solo lleguen cambios pequeños, cada 5 minutos es suficiente.
    El cron nativo de Vercel en `vercel.json` corre una vez al día como respaldo (el plan
    Hobby no permite más seguido; con plan Pro se puede cambiar a `*/5 * * * *`).
 

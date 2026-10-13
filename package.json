@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
+    "@vercel/functions": "^3.10.0",
     "basic-ftp": "^6.2.3",
     "bcryptjs": "^2.4.3",
     "jose": "^5.2.4",
