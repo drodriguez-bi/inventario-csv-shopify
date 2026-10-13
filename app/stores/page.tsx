@@ -65,7 +65,7 @@ export default function StoresPage() {
   }
 
   async function handleDelete(id: number) {
-    if (!confirm('¿Eliminar esta tienda?')) return;
+    if (!confirm('¿Eliminar esta tienda? También se borrarán su historial de cargas y sus feeds. Esto no se puede deshacer.')) return;
     await fetch(`/api/stores/${id}`, { method: 'DELETE' });
     loadStores();
   }

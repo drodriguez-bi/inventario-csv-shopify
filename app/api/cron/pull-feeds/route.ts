@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
   }
 
   // El procesamiento contra Shopify sigue DESPUÉS de responder.
-  const budget = Math.max(5_000, 50_000 - (Date.now() - startedAt));
+  const budget = Math.max(5_000, 45_000 - (Date.now() - startedAt));
   const pendingRows = await sql`SELECT COUNT(*)::int AS c FROM upload_items WHERE status = 'pending'`;
   const pending = (pendingRows[0] as any).c as number;
 
