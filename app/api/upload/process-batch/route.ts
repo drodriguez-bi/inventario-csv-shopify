@@ -86,6 +86,7 @@ export async function POST(req: NextRequest) {
     await sql`
       INSERT INTO upload_items (upload_id, sku, requested_qty, status, product_title, message)
       VALUES (${uploadId}, ${r.sku}, ${r.qty}, ${r.status}, ${r.productTitle}, ${r.message})
+      ON CONFLICT DO NOTHING
     `;
   }
 

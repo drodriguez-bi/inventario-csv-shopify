@@ -76,4 +76,5 @@ CREATE TABLE IF NOT EXISTS upload_items (
 );
 
 CREATE INDEX IF NOT EXISTS idx_upload_items_upload_id ON upload_items(upload_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_upload_items_upload_sku ON upload_items (upload_id, lower(sku));
 CREATE INDEX IF NOT EXISTS idx_upload_items_sku ON upload_items(sku);

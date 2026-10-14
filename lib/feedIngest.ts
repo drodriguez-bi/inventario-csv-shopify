@@ -87,6 +87,7 @@ export async function ingestFeedFile(req: Request, feed: FeedRow): Promise<Inges
     INSERT INTO upload_items (upload_id, sku, requested_qty, status)
     SELECT ${uploadId}, s, q, 'pending'
     FROM UNNEST(${skus}::text[], ${qtys}::int[]) AS t(s, q)
+    ON CONFLICT DO NOTHING
   `;
 
   const firstBatch = await processPendingBatch(INSTANT_PROCESSING_MS);

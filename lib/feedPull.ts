@@ -98,6 +98,7 @@ export async function pullFeed(feed: any): Promise<PullResult> {
       INSERT INTO upload_items (upload_id, sku, requested_qty, status)
       SELECT ${uploadId}, s, q, 'pending'
       FROM UNNEST(${skus}::text[], ${qtys}::int[]) AS t(s, q)
+      ON CONFLICT DO NOTHING
     `;
   }
 
@@ -111,6 +112,7 @@ export async function pullFeed(feed: any): Promise<PullResult> {
     status = `"${remote.filename}": ${rows.length} filas, sin cambios desde la última lectura`;
   }
   await saveStatus(feed.id, status);
+  console.log(JSON.stringify({ evento: 'pullFeed', feed: feed.id, filas: rows.length, enCola: toQueue.length, sinCambios: unchanged, reemplazados: stale.length, uploadId: uploadId ?? null }));
 
   return { ok: true, status, totalRows: rows.length, queued: toQueue.length, unchanged, uploadId };
 }

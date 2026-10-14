@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { refreshUploadCounts } from '@/lib/feedProcessor';
 
 // Evita que Next.js intente analizar/optimizar esta ruta estáticamente
 // (necesario por las dependencias de BD/auth usadas aquí).
@@ -13,11 +13,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'uploadId requerido' }, { status: 400 });
   }
 
-  await sql`
-    UPDATE uploads
-    SET status = 'completed', finished_at = NOW()
-    WHERE id = ${uploadId}
-  `;
+  // Recalcula los contadores a partir de las filas reales y marca la carga como completada.
+  await refreshUploadCounts(Number(uploadId));
 
   return NextResponse.json({ ok: true });
 }

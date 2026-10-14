@@ -256,6 +256,11 @@ lo refresca cada 5 minutos), el sistema va a leerlo por su cuenta:
    El cron nativo de Vercel en `vercel.json` corre una vez al día como respaldo (el plan
    Hobby no permite más seguido; con plan Pro se puede cambiar a `*/5 * * * *`).
 
+**Mantenimiento:** si en el historial una carga muestra cada SKU repetido (por ejemplo
+3,688 filas cuando el archivo trae 922), corre `db/migration_dedupe_items.sql` en Neon: borra
+las copias, recalcula los contadores y pone un candado para que una carga nunca pueda tener
+el mismo SKU dos veces.
+
 **Qué hace en cada lectura:** descarga el archivo, lo compara contra la última cantidad
 aplicada de cada SKU, y manda a Shopify **solo los que cambiaron**. Si Shopify ya tiene esa
 cantidad, ni siquiera escribe. Si el archivo cambia otra vez antes de terminar de procesar,
