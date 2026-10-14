@@ -1,0 +1,31 @@
+{
+  "name": "inventory-system",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "@vercel/functions": "^3.10.0",
+    "basic-ftp": "^6.2.3",
+    "bcryptjs": "^2.4.3",
+    "jose": "^5.2.4",
+    "next": "14.2.35",
+    "papaparse": "^5.4.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "ssh2-sftp-client": "^12.1.1"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.14.2",
+    "@types/papaparse": "^5.3.14",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/ssh2-sftp-client": "^9.0.6",
+    "typescript": "^5.5.2"
+  }
+}
