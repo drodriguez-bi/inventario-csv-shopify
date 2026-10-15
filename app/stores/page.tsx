@@ -150,7 +150,7 @@ export default function StoresPage() {
               {stores.map((s) => (
                 <Fragment key={s.id}>
                   <tr>
-                    <td>{s.name}</td>
+                    <td>{s.name} <span className="muted">(#{s.id})</span></td>
                     <td>{s.shop_domain}</td>
                     <td>{s.api_version}</td>
                     <td>

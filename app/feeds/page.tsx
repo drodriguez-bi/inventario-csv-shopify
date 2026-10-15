@@ -220,7 +220,7 @@ export default function FeedsPage() {
             <select value={storeId} onChange={(e) => handleStoreChange(e.target.value)} required>
               <option value="">Selecciona una tienda</option>
               {stores.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+                <option key={s.id} value={s.id}>{s.name} (#{s.id})</option>
               ))}
             </select>
           </label>

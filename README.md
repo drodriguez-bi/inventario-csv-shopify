@@ -282,6 +282,13 @@ registro (solo actualizan "Última lectura" en la tarjeta del feed).
 - Vercel no tiene IP fija: si el servidor del proveedor solo acepta conexiones desde IPs
   autorizadas, no podrá conectarse.
 
+## 8.9 Diagnóstico: ¿qué base de datos y qué tiendas ve el sistema?
+
+Con tu sesión iniciada, abre `https://tu-dominio.vercel.app/api/debug/db`. Muestra el servidor de
+base de datos que usa el sistema (sin usuario ni contraseña) y las tiendas que ve, con el largo de
+cada token (nunca el token). Sirve para comparar contra lo que ves en el SQL Editor de Neon: si el
+servidor o las tiendas no coinciden, el sistema y el editor están mirando bases distintas.
+
 ## 9. Desarrollo local (opcional)
 ```bash
 npm install
