@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import crypto from 'crypto';
 
+// Si algo falla antes de ir a Shopify, regresamos a Tiendas con el motivo visible.
+function back(req: NextRequest, error: string) {
+  return NextResponse.redirect(`${req.nextUrl.origin}/stores?error=${encodeURIComponent(error)}`);
+}
+
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
@@ -11,20 +16,17 @@ const SCOPES = 'read_products,read_locations,read_inventory,write_inventory';
 export async function GET(req: NextRequest) {
   const storeId = req.nextUrl.searchParams.get('storeId');
   if (!storeId) {
-    return NextResponse.json({ ok: false, error: 'storeId requerido' }, { status: 400 });
+    return back(req, 'Falta indicar qué tienda conectar.');
   }
 
   const rows = await sql`SELECT * FROM stores WHERE id = ${storeId}`;
   const store = rows[0];
 
   if (!store) {
-    return NextResponse.json({ ok: false, error: 'Tienda no encontrada' }, { status: 404 });
+    return back(req, 'No se encontró esa tienda.');
   }
   if (!store.client_id || !store.client_secret) {
-    return NextResponse.json(
-      { ok: false, error: 'Esta tienda no tiene configurado Client ID / Client Secret todavía.' },
-      { status: 400 }
-    );
+    return back(req, 'Esta tienda no tiene Client ID / Client Secret guardados. Elimínala y vuelve a registrarla.');
   }
 
   // "state" evita que alguien más complete este flujo por su cuenta (CSRF)

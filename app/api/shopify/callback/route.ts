@@ -5,6 +5,13 @@ import crypto from 'crypto';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+// Si algo falla al volver de Shopify, regresamos a la pantalla Tiendas con el motivo
+// (antes se veía como texto técnico en una página en blanco).
+function back(req: NextRequest, error: string, log?: unknown) {
+  console.error('Conexión con Shopify falló:', error, log ?? '');
+  return NextResponse.redirect(`${req.nextUrl.origin}/stores?error=${encodeURIComponent(error)}`);
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const shop = searchParams.get('shop');
@@ -13,16 +20,16 @@ export async function GET(req: NextRequest) {
   const hmac = searchParams.get('hmac');
 
   if (!shop || !code || !state || !hmac) {
-    return NextResponse.json({ ok: false, error: 'Faltan parámetros en la respuesta de Shopify.' }, { status: 400 });
+    return back(req, 'Shopify no devolvió los datos de la autorización (faltan parámetros). Vuelve a intentar con "Conectar con Shopify".');
   }
 
-  const rows = await sql`SELECT * FROM stores WHERE shop_domain = ${shop} AND oauth_state = ${state}`;
+  const rows = await sql`SELECT * FROM stores WHERE lower(shop_domain) = lower(${shop}) AND oauth_state = ${state}`;
   const store = rows[0];
 
   if (!store) {
-    return NextResponse.json(
-      { ok: false, error: 'No se encontró una conexión pendiente para esta tienda (estado inválido o expirado).' },
-      { status: 400 }
+    return back(
+      req,
+      `No hay una conexión pendiente para ${shop}. Si la autorización tardó mucho, vuelve a darle "Conectar con Shopify" desde la lista.`
     );
   }
 
@@ -40,27 +47,35 @@ export async function GET(req: NextRequest) {
     crypto.timingSafeEqual(Buffer.from(generatedHmac), Buffer.from(hmac));
 
   if (!validHmac) {
-    return NextResponse.json({ ok: false, error: 'Firma (HMAC) inválida. Conexión rechazada por seguridad.' }, { status: 401 });
+    return back(
+      req,
+      'La firma de Shopify no coincide: el Client Secret guardado para esta tienda no es el de la app que se autorizó. ' +
+        'Elimina la tienda y vuelve a registrarla con el Client ID y Client Secret correctos.'
+    );
   }
 
   // Intercambiar el código temporal por un access token permanente
-  const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: store.client_id,
-      client_secret: store.client_secret,
-      code,
-    }),
-  });
+  let tokenData: any = null;
+  let tokenOk = false;
+  try {
+    const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: store.client_id,
+        client_secret: store.client_secret,
+        code,
+      }),
+    });
+    tokenOk = tokenRes.ok;
+    tokenData = await tokenRes.json().catch(() => null);
+  } catch (e: any) {
+    return back(req, `No se pudo contactar a Shopify para obtener el token: ${e?.message || e}`);
+  }
 
-  const tokenData = await tokenRes.json();
-
-  if (!tokenRes.ok || !tokenData.access_token) {
-    return NextResponse.json(
-      { ok: false, error: 'Shopify no devolvió un access token.', detail: tokenData },
-      { status: 502 }
-    );
+  if (!tokenOk || !tokenData?.access_token) {
+    const detail = tokenData?.error_description || tokenData?.error || JSON.stringify(tokenData);
+    return back(req, `Shopify no entregó el token: ${detail}`, tokenData);
   }
 
   await sql`

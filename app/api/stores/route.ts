@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 export async function GET() {
   const rows = await sql`
     SELECT id, name, shop_domain, api_version,
-           (access_token IS NOT NULL) AS connected
+           (access_token IS NOT NULL AND access_token <> '') AS connected
     FROM stores
     ORDER BY name
   `;
@@ -19,7 +19,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const { name, shop_domain, client_id, client_secret, api_version } = await req.json();
 
-  let domain = (shop_domain || '').trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+  let domain = (shop_domain || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
   const version = (api_version || '').trim() || '2025-10';
 
   if (!name?.trim() || !domain || !client_id?.trim() || !client_secret?.trim()) {
@@ -29,6 +29,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { ok: false, error: 'El dominio debe terminar en .myshopify.com (ej: stanley-1913-mx.myshopify.com)' },
       { status: 400 }
+    );
+  }
+
+  // Evita registrar la misma tienda dos veces (causa de confusiones al conectar)
+  const existing = await sql`SELECT id, name FROM stores WHERE lower(shop_domain) = ${domain}`;
+  if (existing.length > 0) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: `Esa tienda ya está registrada como "${(existing[0] as any).name}". Usa su botón "Reconectar" en la lista, o elimínala primero si quieres registrarla de nuevo.`,
+      },
+      { status: 409 }
     );
   }
 

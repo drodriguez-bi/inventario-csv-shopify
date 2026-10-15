@@ -199,6 +199,44 @@ export async function findVariantBySku(
   };
 }
 
+export type ConnectionTest =
+  | { ok: true; shopName: string; locationCount: number }
+  | { ok: false; kind: 'rejected' | 'missing_scope' | 'other'; message: string };
+
+function readableShopifyError(raw: string | null): string {
+  if (!raw) return 'Sin detalle';
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === 'string') return parsed;
+    if (Array.isArray(parsed) && parsed[0]?.message) return parsed.map((e: any) => e.message).join('; ');
+    if (typeof parsed?.errors === 'string') return parsed.errors;
+    if (Array.isArray(parsed?.errors) && parsed.errors[0]?.message) return parsed.errors.map((e: any) => e.message).join('; ');
+  } catch {
+    // no era JSON
+  }
+  return raw;
+}
+
+/** Prueba el token de una tienda contra Shopify: pide el nombre de la tienda y sus sucursales. */
+export async function testConnection(store: ShopifyStore): Promise<ConnectionTest> {
+  const query = `query testConnection {
+    shop { name myshopifyDomain }
+    locations(first: 50) { edges { node { id name } } }
+  }`;
+  const res = await shopifyGraphQL(store, query, {});
+  if (!res.ok) {
+    const message = readableShopifyError(res.error);
+    if (/Invalid API key or access token/i.test(message)) return { ok: false, kind: 'rejected', message };
+    if (/access denied|ACCESS_DENIED|required access/i.test(res.error ?? '')) return { ok: false, kind: 'missing_scope', message };
+    return { ok: false, kind: 'other', message };
+  }
+  return {
+    ok: true,
+    shopName: res.data?.data?.shop?.name ?? '',
+    locationCount: res.data?.data?.locations?.edges?.length ?? 0,
+  };
+}
+
 export type VariantLookup =
   | { found: false }
   | { found: true; inventoryItemId: number; productTitle: string; currentQuantity: number; stocked: boolean };

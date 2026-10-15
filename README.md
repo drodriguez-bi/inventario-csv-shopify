@@ -74,6 +74,9 @@ Shopify ya no entrega un token fijo directo al crear una app — ahora usa OAuth
 9. Te regresa automáticamente a **Tiendas**, ahora con estatus **Conectada**.
    Internamente el sistema ya guardó el access token — no tienes que copiar
    nada más.
+10. Dale **Probar conexión** a la tienda: pregunta a Shopify de verdad (nombre de la tienda y
+    sucursales) y te dice en pantalla si el token falta, si Shopify lo rechaza, o si falta un
+    permiso. Si algo falla al autorizar, el motivo aparece en rojo en la pantalla de Tiendas.
 
 ## 6. Uso normal
 1. **Nueva carga** → elige la tienda → el sistema trae automáticamente las
