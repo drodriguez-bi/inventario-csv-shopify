@@ -289,6 +289,14 @@ base de datos que usa el sistema (sin usuario ni contraseña) y las tiendas que 
 cada token (nunca el token). Sirve para comparar contra lo que ves en el SQL Editor de Neon: si el
 servidor o las tiendas no coinciden, el sistema y el editor están mirando bases distintas.
 
+### Nota técnica: las consultas a la base de datos nunca usan caché
+
+Next.js 14 guarda en su caché de datos las peticiones `fetch`, y el driver de Neon consulta por
+HTTP con `fetch`. Aun con `dynamic = 'force-dynamic'`, una consulta idéntica devolvía la respuesta
+vieja guardada, y ese caché sobrevive entre despliegues (síntomas: una tienda que sigue "sin token"
+después de conectarla, "Última lectura" que no avanza, contadores del historial desfasados).
+`lib/db.ts` ahora manda cada consulta con `cache: 'no-store'` y `noStore()`. No quites eso.
+
 ## 9. Desarrollo local (opcional)
 ```bash
 npm install

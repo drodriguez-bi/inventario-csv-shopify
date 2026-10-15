@@ -60,6 +60,7 @@ export async function GET(req: NextRequest) {
   try {
     const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, {
       method: 'POST',
+      cache: 'no-store',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         client_id: store.client_id,
