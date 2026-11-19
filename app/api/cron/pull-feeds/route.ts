@@ -3,6 +3,7 @@ import { waitUntil } from '@vercel/functions';
 import { sql } from '@/lib/db';
 import { pullFeed } from '@/lib/feedPull';
 import { processPendingBatch } from '@/lib/feedProcessor';
+import { pruneOldHistory } from '@/lib/retention';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -43,13 +44,23 @@ export async function GET(req: NextRequest) {
   const pendingRows = await sql`SELECT COUNT(*)::int AS c FROM upload_items WHERE status = 'pending'`;
   const pending = (pendingRows[0] as any).c as number;
 
-  if (pending > 0) {
-    waitUntil(
-      processPendingBatch(budget).catch((e) => {
+  // En segundo plano: procesar pendientes y, al final, borrar historial viejo para que la base
+  // de datos no se llene (por defecto se conservan 14 días; ver lib/retention.ts).
+  waitUntil(
+    (async () => {
+      try {
+        if (pending > 0) await processPendingBatch(budget);
+      } catch (e) {
         console.error('Error procesando pendientes en segundo plano:', e);
-      })
-    );
-  }
+      }
+      try {
+        const borradas = await pruneOldHistory();
+        if (borradas > 0) console.log(JSON.stringify({ evento: 'limpiezaHistorial', cargasBorradas: borradas }));
+      } catch (e) {
+        console.error('Error limpiando historial viejo:', e);
+      }
+    })()
+  );
 
   return NextResponse.json({
     ok: true,

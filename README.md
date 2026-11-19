@@ -297,6 +297,27 @@ vieja guardada, y ese caché sobrevive entre despliegues (síntomas: una tienda 
 después de conectarla, "Última lectura" que no avanza, contadores del historial desfasados).
 `lib/db.ts` ahora manda cada consulta con `cache: 'no-store'` y `noStore()`. No quites eso.
 
+### Limpieza del historial (para que la base de datos no se llene)
+
+Cada lectura con cambios guarda una carga y una fila por cada SKU, y el plan gratis de Neon tiene un
+límite de almacenamiento. Por eso el cron borra solo las cargas con más de **14 días** (se cambia con
+la variable `HISTORY_RETENTION_DAYS` en Vercel; `0` desactiva la limpieza). Borra hasta 200 cargas por
+corrida y nunca toca tiendas, feeds ni `feed_snapshot`. Para una limpieza inmediata o para ver qué
+tabla ocupa más, usa `db/limpiar_historial.sql`.
+
+### Cambiar a una base de datos nueva (por ejemplo cuando la gratis se llena)
+
+1. Crea el proyecto nuevo en Neon. Conviene elegir una región cercana a la de tus funciones de
+   Vercel (se ve en el log de Vercel: `iad1` = Washington, EE. UU. este).
+2. En el SQL Editor de la base **nueva**, corre `db/schema.sql` completo.
+3. En el SQL Editor de la base **vieja**, corre `db/exportar_a_base_nueva.sql`: devuelve una sola
+   celda con el script que copia usuarios, tiendas y feeds (sin el historial). Pégalo en la base
+   nueva y córrelo. Trae tokens y contraseñas: no lo guardes ni lo pegues en chats.
+4. En Vercel agrega `APP_DATABASE_URL` con la cadena de conexión de la base nueva (la de
+   "Pooled connection") y vuelve a desplegar. Esa variable tiene prioridad sobre `DATABASE_URL`.
+5. Abre `/api/debug/db` con tu sesión: debe decir `variable_que_usa_el_sistema: APP_DATABASE_URL`
+   y mostrar tus tiendas. Hasta que eso coincida, no borres la base vieja.
+
 ## 9. Desarrollo local (opcional)
 ```bash
 npm install

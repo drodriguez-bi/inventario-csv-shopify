@@ -13,7 +13,13 @@ function hostOf(url?: string) {
 }
 
 export async function GET() {
-  const usa = process.env.DATABASE_URL ? 'DATABASE_URL' : process.env.POSTGRES_URL ? 'POSTGRES_URL' : 'ninguna';
+  const usa = process.env.APP_DATABASE_URL?.trim()
+    ? 'APP_DATABASE_URL'
+    : process.env.DATABASE_URL
+    ? 'DATABASE_URL'
+    : process.env.POSTGRES_URL
+    ? 'POSTGRES_URL'
+    : 'ninguna';
 
   const info = (await sql`SELECT current_database() AS base_de_datos, NOW() AS hora_del_servidor`)[0];
   const stores = await sql`
@@ -27,6 +33,7 @@ export async function GET() {
 
   return NextResponse.json({
     variable_que_usa_el_sistema: usa,
+    servidor_APP_DATABASE_URL: hostOf(process.env.APP_DATABASE_URL),
     servidor_DATABASE_URL: hostOf(process.env.DATABASE_URL),
     servidor_POSTGRES_URL: hostOf(process.env.POSTGRES_URL),
     ...info,

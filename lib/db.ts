@@ -16,13 +16,17 @@ let cached: NeonQueryFunction<false, false> | null = null;
 function getClient(): NeonQueryFunction<false, false> {
   if (cached) return cached;
 
-  // Vercel Postgres (integración nativa con Neon) expone la cadena de conexión
-  // como DATABASE_URL. Si en tu proyecto quedó como POSTGRES_URL, también funciona.
-  const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  // Orden de prioridad:
+  //  1) APP_DATABASE_URL — variable propia: se usa para apuntar a una base distinta a la que
+  //     inyecta la integración de Neon con Vercel (ej. al migrar a una base nueva).
+  //  2) DATABASE_URL — la que crea la integración de Neon con Vercel.
+  //  3) POSTGRES_URL — alternativa de esa misma integración.
+  const connectionString =
+    process.env.APP_DATABASE_URL?.trim() || process.env.DATABASE_URL || process.env.POSTGRES_URL;
 
   if (!connectionString) {
     throw new Error(
-      'Falta la variable de entorno DATABASE_URL (o POSTGRES_URL). Configúrala en Vercel > Storage.'
+      'Falta la variable de entorno APP_DATABASE_URL (o DATABASE_URL / POSTGRES_URL). Configúrala en Vercel > Settings > Environment Variables.'
     );
   }
 
